@@ -180,7 +180,7 @@ pub enum SymphoniaSourceError {
     NoDefaultTrackError(),
 }
 
-/// Represents an audio file being decoded by Symphonia.
+/// Represents an audio buffer being decoded by Symphonia.
 pub struct SymphoniaSource {
     /// Symphonia [`FormatReader`]
     reader: Box<dyn FormatReader>,
