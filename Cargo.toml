@@ -1,0 +1,3 @@
+[workspace]
+members = ["audiothread", "libasampo"]
+resolver = "2"

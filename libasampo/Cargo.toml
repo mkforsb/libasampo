@@ -1,0 +1,14 @@
+[package]
+name = "libasampo"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+glob = "0.3.1"
+log = "0.4.21"
+mockall = "0.12.1"
+symphonia = { version = "0.5.4", features = ["all-codecs"] }
+thiserror = "1.0.58"
+uuid = { version = "1.8.0",  features = ["v4"] }

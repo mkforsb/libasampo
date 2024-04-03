@@ -1,0 +1,13 @@
+[package]
+name = "audiothread"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libpulse-binding = "2.28.1"
+log = "0.4.21"
+samplerate = "0.2.4"
+symphonia = { version = "0.5.4", features = ["all-codecs"] }
+thiserror = "1.0.58"
