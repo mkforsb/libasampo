@@ -98,13 +98,3 @@ where
         LogDiscardState { inner: self, level }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    // use super::*;
-
-    // #[test]
-    // fn from_globerror() {
-    // TODO: impossible to instantiate a GlobError, test using filesystem?
-    // }
-}
