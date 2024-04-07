@@ -44,6 +44,9 @@ pub trait SourceTrait {
     fn uuid(&self) -> &Uuid;
     fn list(&self) -> Result<Vec<Sample>, Error>;
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error>;
+    fn is_enabled(&self) -> bool;
+    fn enable(&mut self);
+    fn disable(&mut self);
 }
 
 // TODO: use enum-dispatch
@@ -78,6 +81,24 @@ impl SourceTrait for Source {
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error> {
         match self {
             Self::FilesystemSource(src) => src.stream(sample),
+        }
+    }
+
+    fn is_enabled(&self) -> bool {
+        match self {
+            Self::FilesystemSource(src) => src.is_enabled(),
+        }
+    }
+
+    fn enable(&mut self) {
+        match self {
+            Self::FilesystemSource(src) => src.enable(),
+        }
+    }
+
+    fn disable(&mut self) {
+        match self {
+            Self::FilesystemSource(src) => src.disable(),
         }
     }
 }

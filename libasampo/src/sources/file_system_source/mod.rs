@@ -27,6 +27,7 @@ where
     path: String,
     uri: String,
     _exts: Vec<String>,
+    enabled: bool,
 }
 
 impl FilesystemSource<DefaultIO> {
@@ -52,6 +53,7 @@ where
             path,
             uri,
             _exts: exts,
+            enabled: true,
         }
     }
 
@@ -102,6 +104,18 @@ where
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error> {
         // TODO: verify starts with "file://", then drop prefix before using with Path::new
         self.io.stream(Path::new(sample.uri()))
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    fn disable(&mut self) {
+        self.enabled = false;
     }
 }
 
