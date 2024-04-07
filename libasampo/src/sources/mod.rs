@@ -39,6 +39,7 @@ impl Read for SourceReader {
 impl SourceReaderTrait for SourceReader {}
 
 pub trait SourceTrait {
+    fn name(&self) -> Option<&str>;
     fn uri(&self) -> &str;
     fn uuid(&self) -> &Uuid;
     fn list(&self) -> Result<Vec<Sample>, Error>;
@@ -51,6 +52,11 @@ pub enum Source {
 }
 
 impl SourceTrait for Source {
+    fn name(&self) -> Option<&str> {
+        match self {
+            Self::FilesystemSource(src) => src.name(),
+        }
+    }
     fn uri(&self) -> &str {
         match self {
             Self::FilesystemSource(src) => src.uri(),

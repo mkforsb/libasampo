@@ -22,6 +22,7 @@ where
     T: IO,
 {
     io: T,
+    name: Option<String>,
     uuid: Uuid,
     path: String,
     uri: String,
@@ -30,7 +31,11 @@ where
 
 impl FilesystemSource<DefaultIO> {
     pub fn new(path: String, exts: Vec<String>) -> Self {
-        FilesystemSource::new_with_io(path, exts, DefaultIO())
+        FilesystemSource::new_with_io(None, path, exts, DefaultIO())
+    }
+
+    pub fn new_named(name: String, path: String, exts: Vec<String>) -> Self {
+        FilesystemSource::new_with_io(Some(name), path, exts, DefaultIO())
     }
 }
 
@@ -38,10 +43,11 @@ impl<T> FilesystemSource<T>
 where
     T: IO,
 {
-    pub fn new_with_io(path: String, exts: Vec<String>, io: T) -> FilesystemSource<T> {
+    pub fn new_with_io(name: Option<String>, path: String, exts: Vec<String>, io: T) -> FilesystemSource<T> {
         let uri = format!("file://{path}");
         FilesystemSource {
             io,
+            name,
             uuid: Uuid::new_v4(),
             path,
             uri,
@@ -70,6 +76,10 @@ impl<T> SourceTrait for FilesystemSource<T>
 where
     T: IO,
 {
+    fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|s| s.as_str())
+    }
+
     fn uri(&self) -> &str {
         &self.uri
     }
@@ -153,7 +163,7 @@ mod tests {
             })
         });
 
-        let src = FilesystemSource::new_with_io(String::from("/samples"), vec![], mockio);
+        let src = FilesystemSource::new_with_io(None, String::from("/samples"), vec![], mockio);
 
         assert_eq!(src.list().expect("three non-error results").len(), 3);
     }
