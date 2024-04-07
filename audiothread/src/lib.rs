@@ -1,5 +1,5 @@
 // MIT License
-// 
+//
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
 #![deny(
@@ -28,11 +28,13 @@ ogg and more.)
 
 # Example
 ```no_run
-let (tx, rx) = std::sync::mpsc::channel();
-let _ = audiothread::spawn(String::from("Audio Thread"), rx, None);
-let sf = audiothread::SymphoniaSource::from_file("/tmp/macarena.wav").unwrap();
+use audiothread::{Opts, Message, SymphoniaSource};
 
-tx.send(audiothread::Message::PlaySymphoniaSource(sf));
+let (tx, rx) = std::sync::mpsc::channel();
+let _ = audiothread::spawn(rx, Some(Opts::default().with_name("Audio Thread")));
+let sf = SymphoniaSource::from_file("/tmp/macarena.wav").unwrap();
+
+tx.send(Message::PlaySymphoniaSource(sf));
 ```
 
 [Symphonia]: https://docs.rs/symphonia/latest/symphonia/
@@ -59,15 +61,6 @@ use symphonia::core::{
 };
 use thiserror::Error as ThisError;
 
-/// Audio output specification.
-///
-/// This will hopefully be a parameter or otherwise configurable in future versions of the crate.
-const SPEC: Spec = Spec {
-    format: Format::FLOAT32NE,
-    rate: 48000,
-    channels: 2,
-};
-
 /// Audio output frame size in bytes.
 ///
 /// A frame contains 1 sample point (in some format, e.g f32) * N channels.
@@ -76,6 +69,13 @@ const FRAMESIZE: usize = 8;
 thread_local! {
     /// Libsamplerate converter type (quality setting, essentially)
     static RATE_CONV_TYPE: Cell<ConverterType> = const { Cell::new(ConverterType::Linear) };
+
+    /// Audio output specification.
+    static SPEC: Cell<Spec> = const { Cell::new(Spec {
+        format: Format::FLOAT32NE,
+        rate: 48000,
+        channels: 2,
+    })};
 }
 
 /// A trait for lazy iterators that can consume their elements without forming a
@@ -241,7 +241,8 @@ impl Iterator for SymphoniaSource {
 
                 match self.decoder.decode(&packet) {
                     Ok(audiobuf) => {
-                        let rate = audiobuf.spec().rate;
+                        let spec = SPEC.get();
+                        let buf_rate = audiobuf.spec().rate;
                         let mut chans = audiobuf.spec().channels.count();
 
                         let mut samplebuf =
@@ -250,27 +251,27 @@ impl Iterator for SymphoniaSource {
 
                         let mut resultbuf = samplebuf.samples().to_vec();
 
-                        while chans < SPEC.channels.into() {
+                        while chans < spec.channels.into() {
                             resultbuf = resultbuf.into_iter().doubled().collect();
                             chans *= 2;
                         }
 
-                        if chans > SPEC.channels.into() {
+                        if chans > spec.channels.into() {
                             resultbuf = resultbuf
                                 .into_iter()
-                                .drop_channels(chans, SPEC.channels.into())
+                                .drop_channels(chans, spec.channels.into())
                                 .collect();
                         }
 
-                        if rate != SPEC.rate {
+                        if buf_rate != spec.rate {
                             let converter_type =
                                 RATE_CONV_TYPE.with(|val| val.clone().into_inner());
 
                             let conv = Samplerate::new(
                                 converter_type,
-                                rate,
-                                SPEC.rate,
-                                SPEC.channels as usize,
+                                buf_rate,
+                                spec.rate,
+                                spec.channels as usize,
                             )
                             .unwrap();
 
@@ -333,11 +334,13 @@ impl SymphoniaSource {
     ///
     /// # Examples
     /// ```no_run
-    /// let (tx, rx) = std::sync::mpsc::channel();
-    /// let _ = audiothread::spawn(String::from("Audio Thread"), rx, None);
-    /// let src = audiothread::SymphoniaSource::from_file("/tmp/macarena.wav").unwrap();
+    /// use audiothread::{Opts, Message, SymphoniaSource};
     ///
-    /// tx.send(audiothread::Message::PlaySymphoniaSource(src));
+    /// let (tx, rx) = std::sync::mpsc::channel();
+    /// let _ = audiothread::spawn(rx, Some(Opts::default().with_name("Audio Thread")));
+    /// let src = SymphoniaSource::from_file("/tmp/macarena.wav").unwrap();
+    ///
+    /// tx.send(Message::PlaySymphoniaSource(src));
     /// ```
     pub fn from_file(path: &str) -> Result<SymphoniaSource, SymphoniaSourceError> {
         Self::from_buf_reader(BufReader::new(File::open(path)?))
@@ -350,14 +353,16 @@ impl SymphoniaSource {
     ///
     /// # Examples
     /// ```no_run
+    /// use audiothread::{Opts, Message, SymphoniaSource};
+    ///
     /// let (tx, rx) = std::sync::mpsc::channel();
-    /// let _ = audiothread::spawn(String::from("Audio Thread"), rx, None);
+    /// let _ = audiothread::spawn(rx, Some(Opts::default().with_name("Audio Thread")));
     /// let buffer: Vec<u8> = vec![0x52, 0x49, 0x46, 0x46];
-    /// let src = audiothread::SymphoniaSource::from_buf_reader(
+    /// let src = SymphoniaSource::from_buf_reader(
     ///     std::io::BufReader::new(std::io::Cursor::new(buffer))
     /// ).unwrap();
     ///
-    /// tx.send(audiothread::Message::PlaySymphoniaSource(src));
+    /// tx.send(Message::PlaySymphoniaSource(src));
     /// ```
     pub fn from_buf_reader<R: Read + Seek + Send + Sync + 'static>(
         mut bufreader: BufReader<R>,
@@ -451,7 +456,9 @@ fn mix(source: &mut Source, output: &mut [f32]) {
                 output
                     .iter_mut()
                     .zip(sf)
-                    .map(|(out, v)| *out += v)
+                    .map(|(out, v)| {
+                        *out += v;
+                    })
                     .consume();
             }
         }
@@ -467,27 +474,24 @@ fn mix(source: &mut Source, output: &mut [f32]) {
 /// # Examples
 ///
 /// ```no_run
-/// use audiothread::{Message, SymphoniaSource};
+/// use audiothread::{Opts, Message, SymphoniaSource, Quality};
 ///
 /// let (tx, rx) = std::sync::mpsc::channel();
-/// let conv = samplerate::ConverterType::SincBestQuality;
-/// let _ = audiothread::spawn(String::from("Music"), rx, Some(conv));
+/// let _ = audiothread::spawn(rx, Some(Opts::default()
+///                                          .with_name("Music")
+///                                          .with_sr_conv_quality(Quality::High)));
 ///
-/// tx.send(Message::PlaySymphoniaSource(SymphoniaSource::from_file("/tmp/mozart.ogg").unwrap()));
+/// tx.send(Message::PlaySymphoniaSource(SymphoniaSource::from_file("/tmp/mozart.ogg")
+///                                                      .unwrap()));
 /// ```
 ///
 /// # Arguments
-/// * `name` - Name of stream for registering with a sound server.
 /// * `rx` - Receiving end of channel for [`Message`]s.
-/// * `conv` - Optionally specified [converter type] (quality level) for sample rate conversion.
+/// * `opts` - Optional custom options via [`Opts`].
 ///
 /// [converter type]: https://docs.rs/samplerate/latest/samplerate/converter_type/enum.ConverterType.html
-pub fn spawn(
-    name: String,
-    rx: mpsc::Receiver<Message>,
-    conv: Option<ConverterType>,
-) -> JoinHandle<()> {
-    thread::spawn(move || threadloop(name, rx, conv))
+pub fn spawn(rx: mpsc::Receiver<Message>, opts: Option<Opts>) -> JoinHandle<()> {
+    thread::spawn(move || threadloop(rx, opts))
 }
 
 /// Fetch all messages on a receiver using a timeout for the first one but not for any
@@ -511,20 +515,30 @@ fn recv_all(rx: &std::sync::mpsc::Receiver<Message>, timeout: Duration) -> Optio
 /// # Panics
 ///
 /// This function will panic if the audio spec is invalid or has the wrong frame size.
-fn threadloop(name: String, rx: mpsc::Receiver<Message>, conv: Option<ConverterType>) {
-    assert!(SPEC.is_valid());
-    assert!(SPEC.frame_size() == FRAMESIZE);
+fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
+    let opts = opts.unwrap_or_default();
 
-    if let Some(tpe) = conv {
-        RATE_CONV_TYPE.replace(tpe);
-    }
+    RATE_CONV_TYPE.replace(match opts.sr_conv_quality {
+        Quality::Fastest => ConverterType::ZeroOrderHold,
+        Quality::Low => ConverterType::Linear,
+        Quality::Medium => ConverterType::SincMediumQuality,
+        Quality::High => ConverterType::SincBestQuality,
+    });
+
+    SPEC.replace(Spec {
+        rate: opts.sample_rate,
+        ..SPEC.get()
+    });
+
+    assert!(SPEC.get().is_valid());
+    assert!(SPEC.get().frame_size() == FRAMESIZE);
 
     log::log!(log::Level::Info, "Audiothread starting up");
 
     let mut pa_mainloop = Mainloop::new().expect("Libpulse can allocate a mainloop");
 
     let pa_context = Rc::new(RefCell::new(
-        Context::new(&pa_mainloop, &name).expect("Libpulse can allocate a context"),
+        Context::new(&pa_mainloop, &opts.stream_name).expect("Libpulse can allocate a context"),
     ));
     let pa_context_csc = Rc::clone(&pa_context);
 
@@ -612,7 +626,7 @@ fn threadloop(name: String, rx: mpsc::Receiver<Message>, conv: Option<ConverterT
                 let have_stream = pa_stream_csc.borrow_mut().is_some();
 
                 if !have_stream {
-                    let mut s = Stream::new(ctx, "stream", &SPEC, None)
+                    let mut s = Stream::new(ctx, "stream", &SPEC.get(), None)
                         .expect("Libpulse can allocate a stream");
 
                     s.set_state_callback(Some(Box::new(stream_state_changed.clone())));
@@ -658,11 +672,12 @@ fn threadloop(name: String, rx: mpsc::Receiver<Message>, conv: Option<ConverterT
             #[allow(clippy::single_match)]
             match pa_stream.borrow_mut().as_mut().unwrap().connect_playback(
                 None,
+                // None,
                 Some(&BufferAttr {
-                    maxlength: 2048,
-                    tlength: 2048,
-                    prebuf: 1,
-                    minreq: 2048,
+                    maxlength: (opts.bufsize_n_stereo_samples * FRAMESIZE) as u32,
+                    tlength: (opts.bufsize_n_stereo_samples * FRAMESIZE) as u32,
+                    prebuf: 0,
+                    minreq: (opts.bufsize_n_stereo_samples * FRAMESIZE) as u32,
                     fragsize: 0,
                 }),
                 stream::FlagSet::ADJUST_LATENCY,
@@ -741,6 +756,118 @@ pub enum Message {
     PlaySymphoniaSource(SymphoniaSource),
 }
 
+/// Quality levels.
+#[derive(Debug, PartialEq)]
+pub enum Quality {
+    /// Use whatever is the fastest setting.
+    Fastest,
+
+    /// Use low quality.
+    Low,
+
+    /// Use medium quality.
+    Medium,
+
+    /// Use high quality.
+    High,
+}
+
+/// Audio thread options.
+///
+/// # Default values
+/// ```
+/// let opts = audiothread::Opts::default();
+///
+/// assert_eq!(opts.stream_name, "Audio");
+/// assert_eq!(opts.sample_rate, 48000);
+/// assert_eq!(opts.sr_conv_quality, audiothread::Quality::Medium);
+/// assert_eq!(opts.bufsize_n_stereo_samples, 2048);
+/// ```
+///
+/// # Example
+///
+/// ```no_run
+/// let opts = audiothread::Opts::default()
+///     .with_name("Music Stream")
+///     .with_sample_rate(44100)
+///     .with_sr_conv_quality(audiothread::Quality::Fastest)
+///     .with_bufsize_n_stereo_samples(1024);
+/// ```
+#[derive(Debug)]
+pub struct Opts {
+    /// Name to register with sound server.
+    pub stream_name: String,
+
+    /// Output sample rate.
+    pub sample_rate: u32,
+
+    /// Sample rate conversion quality.
+    pub sr_conv_quality: Quality,
+
+    /// Buffer size in number of stereo samples.
+    pub bufsize_n_stereo_samples: usize,
+}
+
+impl Default for Opts {
+    fn default() -> Self {
+        Opts {
+            stream_name: String::from("Audio"),
+            sample_rate: 48000,
+            sr_conv_quality: Quality::Medium,
+            bufsize_n_stereo_samples: 2048,
+        }
+    }
+}
+
+impl Opts {
+    /// Create a new set of options.
+    pub fn new<T: Into<String>>(
+        name: T,
+        sample_rate: u32,
+        conv_quality: Quality,
+        bufsize_n_stereo_samples: usize,
+    ) -> Self {
+        Opts {
+            stream_name: name.into(),
+            sample_rate,
+            sr_conv_quality: conv_quality,
+            bufsize_n_stereo_samples,
+        }
+    }
+
+    /// Make an updated option set using the given name.
+    pub fn with_name<T: Into<String>>(self, name: T) -> Self {
+        Opts {
+            stream_name: name.into(),
+            ..self
+        }
+    }
+
+    /// Make an updated option set using the given output sample rate.
+    pub fn with_sample_rate(self, sample_rate: u32) -> Self {
+        Opts {
+            sample_rate,
+            ..self
+        }
+    }
+
+    /// Make an updated option set using the given sample rate conversion quality.
+    pub fn with_sr_conv_quality(self, conv_quality: Quality) -> Self {
+        Opts {
+            sr_conv_quality: conv_quality,
+            ..self
+        }
+    }
+
+    /// Make an updated option set using the given buffer size of N stereo samples.
+    pub fn with_bufsize_n_stereo_samples(self, bufsize_n_stereo_samples: usize) -> Self {
+        Opts {
+            bufsize_n_stereo_samples,
+            ..self
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,8 +875,8 @@ mod tests {
 
     #[test]
     fn test_spec() {
-        assert!(SPEC.is_valid());
-        assert_eq!(SPEC.frame_size(), FRAMESIZE);
+        assert!(SPEC.get().is_valid());
+        assert_eq!(SPEC.get().frame_size(), FRAMESIZE);
     }
 
     #[test]
@@ -920,9 +1047,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_opts() {
+        let opts = Opts::default();
+
+        let opts = opts.with_name("Sound Effects");
+        let opts = opts.with_sample_rate(22500);
+        let opts = opts.with_sr_conv_quality(Quality::Medium);
+        let opts = opts.with_bufsize_n_stereo_samples(31415);
+
+        assert_eq!(opts.stream_name, "Sound Effects");
+        assert_eq!(opts.sample_rate, 22500);
+        assert_eq!(opts.sr_conv_quality, Quality::Medium);
+        assert_eq!(opts.bufsize_n_stereo_samples, 31415);
+
+        let opts = Opts::default()
+            .with_name("Background Music")
+            .with_sr_conv_quality(Quality::High);
+
+        assert_eq!(opts.stream_name, "Background Music");
+        assert_eq!(opts.sr_conv_quality, Quality::High);
+    }
+
     #[ignore]
     #[test]
     fn test_threadloop() {
         // TODO: needs libpulse mocks
+    }
+
+    #[ignore]
+    #[test]
+    fn test_opts_applied() {
+        // TODO: test opts being applied by spawn/threadloop
     }
 }
