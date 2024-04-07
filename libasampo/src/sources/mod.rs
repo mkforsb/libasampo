@@ -45,6 +45,7 @@ pub trait SourceTrait {
     fn list(&self) -> Result<Vec<Sample>, Error>;
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error>;
     fn is_enabled(&self) -> bool;
+    fn set_enabled(&mut self, enabled: bool);
     fn enable(&mut self);
     fn disable(&mut self);
 }
@@ -87,6 +88,12 @@ impl SourceTrait for Source {
     fn is_enabled(&self) -> bool {
         match self {
             Self::FilesystemSource(src) => src.is_enabled(),
+        }
+    }
+
+    fn set_enabled(&mut self, enabled: bool) {
+        match self {
+            Self::FilesystemSource(src) => src.set_enabled(enabled),
         }
     }
 

@@ -110,6 +110,10 @@ where
         self.enabled
     }
 
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
     fn enable(&mut self) {
         self.enabled = true;
     }
