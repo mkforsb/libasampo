@@ -44,7 +44,7 @@ use std::cell::{BorrowMutError, Cell, RefCell, RefMut};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::rc::Rc;
-use std::sync::mpsc;
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use std::vec;
@@ -494,19 +494,43 @@ pub fn spawn(rx: mpsc::Receiver<Message>, opts: Option<Opts>) -> JoinHandle<()> 
     thread::spawn(move || threadloop(rx, opts))
 }
 
+#[derive(Debug)]
+enum ChannelError {
+    Disconnected,
+}
+
 /// Fetch all messages on a receiver using a timeout for the first one but not for any
 /// subsequent ones, thus the call should sleep at most as long as the given duration.
-fn recv_all(rx: &std::sync::mpsc::Receiver<Message>, timeout: Duration) -> Option<Vec<Message>> {
-    if let Ok(message) = rx.recv_timeout(timeout) {
-        let mut messages = vec![message];
+fn recv_all(rx: &std::sync::mpsc::Receiver<Message>, timeout: Duration) -> Result<Option<Vec<Message>>, ChannelError> {
+    match rx.recv_timeout(timeout) {
+        Ok(message) => {
+            let mut messages = vec![message];
 
-        while let Ok(message) = rx.try_recv() {
-            messages.push(message);
+            let mut quit = false;
+            let mut disconnected = false;
+
+            while !quit {
+                match rx.try_recv() {
+                    Ok(message) => { messages.push(message) },
+                    Err(mpsc::TryRecvError::Empty) => { quit = true; },
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        quit = true;
+                        disconnected = true;
+                    },
+                }
+            }
+
+            if disconnected {
+                Err(ChannelError::Disconnected)
+            } else {
+                Ok(Some(messages))
+            }
+        },
+
+        Err(err) => match err {
+            RecvTimeoutError::Timeout => Ok(None),
+            RecvTimeoutError::Disconnected => Err(ChannelError::Disconnected),
         }
-
-        Some(messages)
-    } else {
-        None
     }
 }
 
@@ -694,19 +718,27 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
         // FIXME: what if sleeping here causes underflow on the sound server?
         // simple way to cause the issue is to play a very large number of sources simultaneously
         // maybe the timeout value here should be a parameter, or adjusted based on load
-        if let Some(messages) = recv_all(&rx, Duration::from_millis(2)) {
-            for message in messages {
-                match message {
-                    Message::Shutdown() => {
-                        quit = true;
-                        break;
+        match recv_all(&rx, Duration::from_millis(2)) {
+            Ok(Some(messages)) => {
+                for message in messages {
+                    match message {
+                        Message::Shutdown() => {
+                            quit = true;
+                            break;
+                        }
+                        Message::DropAll() => sources.borrow_mut().clear(),
+                        Message::PlaySymphoniaSource(sf) => sources
+                            .borrow_mut()
+                            .push(Source::SymphoniaSource(StreamState::Streaming, sf)),
                     }
-                    Message::DropAll() => sources.borrow_mut().clear(),
-                    Message::PlaySymphoniaSource(sf) => sources
-                        .borrow_mut()
-                        .push(Source::SymphoniaSource(StreamState::Streaming, sf)),
                 }
-            }
+            },
+
+            Ok(None) => (),
+            Err(ChannelError::Disconnected) => {
+                log::log!(log::Level::Error, "Message channel disconnected, shutting down");
+                break
+            },
         }
 
         if quit {
@@ -730,12 +762,14 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
 
     log::log!(log::Level::Info, "Audiothread shutting down gracefully");
 
-    pa_stream
-        .borrow_mut()
-        .as_mut()
-        .unwrap()
-        .disconnect()
-        .expect("We should have disconnected from PulseAudio");
+    if stream_asked_connect {
+        pa_stream
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .disconnect()
+            .expect("We should have disconnected from PulseAudio");
+    }
 
     pa_context.borrow_mut().disconnect();
 
@@ -925,7 +959,7 @@ mod tests {
 
         let (tx, rx) = mpsc::channel::<Message>();
 
-        assert!(recv_all(&rx, Duration::from_millis(0)).is_none());
+        assert!(recv_all(&rx, Duration::from_millis(0)).is_ok_and(|m| m.is_none()));
 
         tx.send(Message::DropAll()).unwrap();
         tx.send(Message::Shutdown()).unwrap();
@@ -933,12 +967,13 @@ mod tests {
 
         let x = recv_all(&rx, Duration::from_millis(0))
             .unwrap()
+            .unwrap()
             .into_iter()
             .map(fmt_message)
             .collect::<Vec<String>>();
 
         assert_eq!(x, vec!["DropAll", "Shutdown", "DropAll"]);
-        assert!(recv_all(&rx, Duration::from_millis(0)).is_none());
+        assert!(recv_all(&rx, Duration::from_millis(0)).is_ok_and(|m| m.is_none()));
     }
 
     #[test]
