@@ -6,8 +6,6 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::vec::IntoIter;
 
-use mockall::automock;
-
 use crate::errors::Error;
 use crate::samples::SampleMetadata;
 use crate::sources::SourceReader;
@@ -22,8 +20,7 @@ impl Iterator for GlobPathsWithMappedError {
     }
 }
 
-#[automock(type Paths=IntoIter<Result<PathBuf, Error>>;)]
-pub trait IO {
+pub trait IO: Clone {
     type Paths: Iterator<Item = Result<PathBuf, Error>>;
 
     // These could be static, but mockall is nicer to use with non-static methods.
@@ -33,8 +30,29 @@ pub trait IO {
     fn metadata(&self, path: &Path) -> Result<SampleMetadata, Error>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DefaultIO();
+
+mockall::mock!{
+    pub IO { }
+
+    impl IO for IO {
+        type Paths = IntoIter<Result<PathBuf, Error>>;
+
+        fn glob(&self, pattern: &str) -> Result<<Self as IO>::Paths, Error>;
+        fn is_file(&self, path: &Path) -> bool;
+        fn stream(&self, path: &Path) -> Result<SourceReader, Error>;
+        fn metadata(&self, path: &Path) -> Result<SampleMetadata, Error>;
+    }
+
+    impl Clone for IO {
+        fn clone(&self) -> Self;
+    }
+
+    impl std::fmt::Debug for IO {
+        fn fmt<'a>(&self, f: &mut std::fmt::Formatter<'a>) -> std::fmt::Result;
+    }
+}
 
 impl IO for DefaultIO {
     type Paths = GlobPathsWithMappedError;

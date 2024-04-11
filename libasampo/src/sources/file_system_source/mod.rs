@@ -1,13 +1,13 @@
 // MIT License
-// 
+//
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
 use std::path::Path;
 
 use uuid::Uuid;
 
-use crate::prelude::*;
 use crate::errors::{Error, LogDiscard};
+use crate::prelude::*;
 use crate::samples::{BasicSample, Sample};
 
 pub mod io;
@@ -16,7 +16,7 @@ use self::io::{DefaultIO, IO};
 
 use super::SourceReader;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FilesystemSource<T>
 where
     T: IO,
@@ -44,7 +44,12 @@ impl<T> FilesystemSource<T>
 where
     T: IO,
 {
-    pub fn new_with_io(name: Option<String>, path: String, exts: Vec<String>, io: T) -> FilesystemSource<T> {
+    pub fn new_with_io(
+        name: Option<String>,
+        path: String,
+        exts: Vec<String>,
+        io: T,
+    ) -> FilesystemSource<T> {
         let uri = format!("file://{path}");
         FilesystemSource {
             io,
@@ -74,9 +79,18 @@ where
     }
 }
 
-impl<T> SourceTrait for FilesystemSource<T>
+impl<T> PartialEq for FilesystemSource<T>
 where
     T: IO,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.uuid == other.uuid
+    }
+}
+
+impl<T> SourceTrait for FilesystemSource<T>
+where
+    T: IO + std::fmt::Debug,
 {
     fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|s| s.as_str())

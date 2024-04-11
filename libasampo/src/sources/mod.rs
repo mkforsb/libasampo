@@ -1,5 +1,5 @@
 // MIT License
-// 
+//
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
 use std::fs::File;
@@ -38,7 +38,7 @@ impl Read for SourceReader {
 
 impl SourceReaderTrait for SourceReader {}
 
-pub trait SourceTrait {
+pub trait SourceTrait: PartialEq + Clone + std::fmt::Debug {
     fn name(&self) -> Option<&str>;
     fn uri(&self) -> &str;
     fn uuid(&self) -> &Uuid;
@@ -106,6 +106,28 @@ impl SourceTrait for Source {
     fn disable(&mut self) {
         match self {
             Self::FilesystemSource(src) => src.disable(),
+        }
+    }
+}
+
+impl Clone for Source {
+    fn clone(&self) -> Self {
+        match self {
+            Self::FilesystemSource(src) => Self::FilesystemSource(src.clone()),
+        }
+    }
+}
+
+impl std::fmt::Debug for Source {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Source")
+    }
+}
+
+impl std::cmp::PartialEq for Source {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::FilesystemSource(left), Self::FilesystemSource(right)) => left == right,
         }
     }
 }

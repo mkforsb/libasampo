@@ -1,5 +1,5 @@
 // MIT License
-// 
+//
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
 use uuid::Uuid;
@@ -61,33 +61,40 @@ impl SampleTrait for BasicSample {
 }
 
 // TODO: use enum-dispatch
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Sample {
     BasicSample(BasicSample),
+
+    #[default]
+    DefaultSample,
 }
 
 impl SampleTrait for Sample {
     fn uri(&self) -> &str {
         match self {
             Self::BasicSample(s) => s.uri(),
+            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn name(&self) -> &str {
         match self {
             Self::BasicSample(s) => s.name(),
+            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn metadata(&self) -> &SampleMetadata {
         match self {
             Self::BasicSample(s) => s.metadata(),
+            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn source_uuid(&self) -> Option<&Uuid> {
         match self {
             Self::BasicSample(s) => s.source_uuid(),
+            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 }
