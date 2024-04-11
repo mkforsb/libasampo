@@ -26,7 +26,7 @@ where
     uuid: Uuid,
     path: String,
     uri: String,
-    _exts: Vec<String>,
+    exts: Vec<String>,
     enabled: bool,
 }
 
@@ -57,7 +57,7 @@ where
             uuid: Uuid::new_v4(),
             path,
             uri,
-            _exts: exts,
+            exts,
             enabled: true,
         }
     }
@@ -93,7 +93,7 @@ where
     T: IO + std::fmt::Debug,
 {
     fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|s| s.as_str())
+        self.name.as_deref()
     }
 
     fn uri(&self) -> &str {
@@ -105,14 +105,19 @@ where
     }
 
     fn list(&self) -> Result<Vec<Sample>, Error> {
-        // TODO: use .exts
-        Ok(self
-            .io
-            .glob(format!("{}/**/*.wav", self.path).as_str())?
-            .log_and_discard_errors(log::Level::Error)
-            .map(|path| self.sample_from_path(&path))
-            .log_and_discard_errors(log::Level::Error)
-            .collect())
+        let mut result = Vec::<_>::new();
+
+        for ext in self.exts.iter() {
+            result.extend(
+                self.io
+                    .glob(format!("{}/**/*.{ext}", self.path).as_str())?
+                    .log_and_discard_errors(log::Level::Error)
+                    .map(|path| self.sample_from_path(&path))
+                    .log_and_discard_errors(log::Level::Error),
+            )
+        }
+
+        Ok(result)
     }
 
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error> {
@@ -164,39 +169,67 @@ mod tests {
             };
         }
 
-        let mut mockio = io::MockIO::default();
+        fn mock() -> io::MockIO {
+            let mut mockio = io::MockIO::default();
 
-        mockio
-            .expect_glob()
-            .with(predicate::eq("/samples/**/*.wav"))
-            .returning(|_| {
-                Ok(vec![
-                    Ok(path!("/samples/first.wav")),
-                    Ok(path!("/samples/second.wav")),
-                    Err(Error::IoError {
-                        uri: String::from("bad uri"),
-                        details: String::from("random error"),
-                    }),
-                    Ok(path!("/samples/third.wav")),
-                    Ok(path!("/samples/__MACOSX/.third.wav")),
-                ]
-                .into_iter())
+            mockio
+                .expect_glob()
+                .with(predicate::eq("/samples/**/*.wav"))
+                .returning(|_| {
+                    Ok(vec![
+                        Ok(path!("/samples/first.wav")),
+                        Ok(path!("/samples/second.wav")),
+                        Err(Error::IoError {
+                            uri: String::from("bad uri"),
+                            details: String::from("random error"),
+                        }),
+                        Ok(path!("/samples/third.wav")),
+                        Ok(path!("/samples/__MACOSX/.third.wav")),
+                    ]
+                    .into_iter())
+                });
+
+            mockio
+                .expect_glob()
+                .with(predicate::eq("/samples/**/*.ogg"))
+                .returning(|_| Ok(vec![Ok(path!("/samples/first.ogg"))].into_iter()));
+
+            mockio
+                .expect_is_file()
+                .returning(|path| path.to_str() != Some("/samples/__MACOSX/.third.wav"));
+
+            mockio.expect_metadata().returning(|_| {
+                Ok(SampleMetadata {
+                    rate: 44100,
+                    channels: 2,
+                    src_fmt_display: String::from("PCM S16LE"),
+                })
             });
+            mockio
+        }
 
-        mockio
-            .expect_is_file()
-            .returning(|path| path.to_str() != Some("/samples/__MACOSX/.third.wav"));
-
-        mockio.expect_metadata().returning(|_| {
-            Ok(SampleMetadata {
-                rate: 44100,
-                channels: 2,
-                src_fmt_display: String::from("PCM S16LE"),
-            })
-        });
-
-        let src = FilesystemSource::new_with_io(None, String::from("/samples"), vec![], mockio);
-
+        let src = FilesystemSource::new_with_io(
+            None,
+            String::from("/samples"),
+            vec!["wav".to_string()],
+            mock(),
+        );
         assert_eq!(src.list().expect("three non-error results").len(), 3);
+
+        let src = FilesystemSource::new_with_io(
+            None,
+            String::from("/samples"),
+            vec!["ogg".to_string()],
+            mock(),
+        );
+        assert_eq!(src.list().expect("one non-error results").len(), 1);
+
+        let src = FilesystemSource::new_with_io(
+            None,
+            String::from("/samples"),
+            vec!["wav".to_string(), "ogg".to_string()],
+            mock(),
+        );
+        assert_eq!(src.list().expect("four non-error results").len(), 4);
     }
 }
