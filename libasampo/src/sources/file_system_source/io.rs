@@ -4,6 +4,8 @@
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
+
+#[cfg(test)]
 use std::vec::IntoIter;
 
 use crate::errors::Error;
@@ -33,6 +35,7 @@ pub trait IO: Clone {
 #[derive(Debug, Clone)]
 pub struct DefaultIO();
 
+#[cfg(test)]
 mockall::mock!{
     pub IO { }
 

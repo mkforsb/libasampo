@@ -6,3 +6,4 @@ pub mod prelude;
 pub mod errors;
 pub mod samples;
 pub mod sources;
+pub mod serialize;

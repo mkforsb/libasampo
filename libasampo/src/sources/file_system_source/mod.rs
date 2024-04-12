@@ -77,6 +77,10 @@ where
             (_, None) => Err(Error::IoError("{n/a}", "Invalid UTF-8 in path")),
         }
     }
+
+    pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
+        self.uuid = uuid;
+    }
 }
 
 impl<T> PartialEq for FilesystemSource<T>
