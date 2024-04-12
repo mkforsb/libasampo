@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::sources::file_system_source::{io::DefaultIO, FilesystemSource};
+use crate::sources::{Source as RealSource, file_system_source::{io::{DefaultIO, IO}, FilesystemSource as RealFilesystemSource}};
 
 pub trait IntoDomain<T> {
     fn into_domain(self) -> T;
@@ -17,11 +17,24 @@ pub struct FilesystemSourceV1 {
     enabled: bool,
 }
 
-impl IntoDomain<crate::sources::Source> for FilesystemSourceV1 {
-    fn into_domain(self) -> crate::sources::Source {
-        let mut src = FilesystemSource::new_with_io(self.name, self.path, self.exts, DefaultIO());
+impl IntoDomain<RealSource> for FilesystemSourceV1 {
+    fn into_domain(self) -> RealSource {
+        let mut src = RealFilesystemSource::new_with_io(self.name, self.path, self.exts, DefaultIO());
         src.set_uuid(self.uuid);
-        crate::sources::Source::FilesystemSource(src)
+        RealSource::FilesystemSource(src)
+    }
+}
+
+impl<T: IO> From<RealFilesystemSource<T>> for FilesystemSourceV1 {
+    fn from(src: RealFilesystemSource<T>) -> Self {
+        FilesystemSourceV1 {
+            name: src.name.clone(),
+            uuid: src.uuid.clone(),
+            path: src.path.clone(),
+            uri: src.uri.clone(),
+            exts: src.exts.clone(),
+            enabled: src.enabled,
+        }
     }
 }
 
@@ -30,11 +43,19 @@ pub enum Source {
     FilesystemSourceV1(FilesystemSourceV1),
 }
 
-impl IntoDomain<crate::sources::Source> for Source {
-    fn into_domain(self) -> crate::sources::Source {
+impl IntoDomain<RealSource> for Source {
+    fn into_domain(self) -> RealSource {
         match self {
             Source::FilesystemSourceV1(src) => src.into_domain(),
         }
+    }
+}
+
+impl From<RealSource> for Source {
+    fn from(value: RealSource) -> Self {
+        match value {
+            RealSource::FilesystemSource(src) => Source::FilesystemSourceV1(FilesystemSourceV1::from(src)),
+        } 
     }
 }
 
@@ -77,7 +98,7 @@ mod tests {
         }
 
         match domained {
-            crate::sources::Source::FilesystemSource(domained_src) => {
+            RealSource::FilesystemSource(domained_src) => {
                 assert_eq!(domained_src.name(), name.as_deref());
                 assert_eq!(domained_src.uuid(), &uuid);
                 assert_eq!(domained_src.uri(), uri);

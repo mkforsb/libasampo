@@ -21,13 +21,13 @@ pub struct FilesystemSource<T>
 where
     T: IO,
 {
-    io: T,
-    name: Option<String>,
-    uuid: Uuid,
-    path: String,
-    uri: String,
-    exts: Vec<String>,
-    enabled: bool,
+    pub(crate) io: T,
+    pub(crate) name: Option<String>,
+    pub(crate) uuid: Uuid,
+    pub(crate) path: String,
+    pub(crate) uri: String,
+    pub(crate) exts: Vec<String>,
+    pub(crate) enabled: bool,
 }
 
 impl FilesystemSource<DefaultIO> {
