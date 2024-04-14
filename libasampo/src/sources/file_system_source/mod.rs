@@ -65,7 +65,7 @@ where
     pub fn sample_from_path(&self, path: &Path) -> Result<Sample, Error> {
         match (self.io.is_file(path), path.to_str()) {
             (true, Some(s)) => Ok(Sample::BasicSample(BasicSample::new(
-                s.to_string(),
+                format!("file://{s}"),
                 path.file_name()
                     .and_then(|name| name.to_str())
                     .expect("file has valid UTF-8 name due to is_file and path.to_str")
@@ -125,8 +125,15 @@ where
     }
 
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error> {
-        // TODO: verify starts with "file://", then drop prefix before using with Path::new
-        self.io.stream(Path::new(sample.uri()))
+        if sample.uri().starts_with("file://") {
+            self.io
+                .stream(Path::new(&String::from_iter(sample.uri().chars().skip(7))))
+        } else {
+            Err(Error::SourceInvalidUriError {
+                uri: sample.uri().to_string(),
+                source_type: String::from("FilesystemSource"),
+            })
+        }
     }
 
     fn is_enabled(&self) -> bool {

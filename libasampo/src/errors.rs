@@ -1,5 +1,5 @@
 // MIT License
-// 
+//
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
 use std::{error::Error as StdError, io};
@@ -13,6 +13,9 @@ pub enum Error {
 
     #[error("Symphonia error: {0}")]
     SymphoniaError(#[from] symphonia::core::errors::Error),
+
+    #[error("Source error: \"{uri}\" is not a valid URI for \"{source_type}\"")]
+    SourceInvalidUriError { uri: String, source_type: String },
 }
 
 impl Error {
