@@ -29,7 +29,7 @@ impl<T: IO> From<RealFilesystemSource<T>> for FilesystemSourceV1 {
     fn from(src: RealFilesystemSource<T>) -> Self {
         FilesystemSourceV1 {
             name: src.name.clone(),
-            uuid: src.uuid.clone(),
+            uuid: src.uuid,
             path: src.path.clone(),
             uri: src.uri.clone(),
             exts: src.exts.clone(),
