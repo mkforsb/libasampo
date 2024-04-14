@@ -494,8 +494,10 @@ pub fn spawn(rx: mpsc::Receiver<Message>, opts: Option<Opts>) -> JoinHandle<()> 
     thread::spawn(move || threadloop(rx, opts))
 }
 
+/// Errors that may arise in MPSC-channel operations.
 #[derive(Debug)]
 enum ChannelError {
+    /// The channel is disconnected.
     Disconnected,
 }
 
