@@ -793,7 +793,7 @@ pub enum Message {
 }
 
 /// Quality levels.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Quality {
     /// Use whatever is the fastest setting.
     Fastest,
