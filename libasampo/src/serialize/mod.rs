@@ -1,7 +1,13 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::sources::{Source as RealSource, file_system_source::{io::{DefaultIO, IO}, FilesystemSource as RealFilesystemSource}};
+use crate::sources::{
+    file_system_source::{
+        io::{DefaultIO, IO},
+        FilesystemSource as RealFilesystemSource,
+    },
+    Source as RealSource,
+};
 
 pub trait IntoDomain<T> {
     fn into_domain(self) -> T;
@@ -19,7 +25,8 @@ pub struct FilesystemSourceV1 {
 
 impl IntoDomain<RealSource> for FilesystemSourceV1 {
     fn into_domain(self) -> RealSource {
-        let mut src = RealFilesystemSource::new_with_io(self.name, self.path, self.exts, DefaultIO());
+        let mut src =
+            RealFilesystemSource::new_with_io(self.name, self.path, self.exts, DefaultIO());
         src.set_uuid(self.uuid);
         RealSource::FilesystemSource(src)
     }
@@ -54,8 +61,10 @@ impl IntoDomain<RealSource> for Source {
 impl From<RealSource> for Source {
     fn from(value: RealSource) -> Self {
         match value {
-            RealSource::FilesystemSource(src) => Source::FilesystemSourceV1(FilesystemSourceV1::from(src)),
-        } 
+            RealSource::FilesystemSource(src) => {
+                Source::FilesystemSourceV1(FilesystemSourceV1::from(src))
+            }
+        }
     }
 }
 

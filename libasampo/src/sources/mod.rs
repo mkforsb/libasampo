@@ -42,7 +42,7 @@ impl Read for SourceReader {
                 } else {
                     Ok(0)
                 }
-            },
+            }
             Self::NullReader() => unimplemented!(),
         }
     }
@@ -53,22 +53,20 @@ impl Seek for SourceReader {
         match self {
             SourceReader::FileReader(fd) => fd.seek(spec),
 
-            SourceReader::VecReader(v, pos) => {
-                match spec {
-                    std::io::SeekFrom::Start(to) => {
-                        *pos = core::cmp::min(to as usize, v.len());
-                        Ok(4 * (*pos as u64))
-                    },
+            SourceReader::VecReader(v, pos) => match spec {
+                std::io::SeekFrom::Start(to) => {
+                    *pos = core::cmp::min(to as usize, v.len());
+                    Ok(4 * (*pos as u64))
+                }
 
-                    std::io::SeekFrom::End(to) => {
-                        *pos = core::cmp::max(0, *pos - (to as usize));
-                        Ok(4 * (*pos as u64))
-                    },
+                std::io::SeekFrom::End(to) => {
+                    *pos = core::cmp::max(0, *pos - (to as usize));
+                    Ok(4 * (*pos as u64))
+                }
 
-                    std::io::SeekFrom::Current(to) => {
-                        *pos = core::cmp::min(*pos + (to as usize), v.len());
-                        Ok(4 * (*pos as u64))
-                    },
+                std::io::SeekFrom::Current(to) => {
+                    *pos = core::cmp::min(*pos + (to as usize), v.len());
+                    Ok(4 * (*pos as u64))
                 }
             },
 

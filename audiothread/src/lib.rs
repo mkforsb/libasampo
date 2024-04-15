@@ -503,7 +503,10 @@ enum ChannelError {
 
 /// Fetch all messages on a receiver using a timeout for the first one but not for any
 /// subsequent ones, thus the call should sleep at most as long as the given duration.
-fn recv_all(rx: &std::sync::mpsc::Receiver<Message>, timeout: Duration) -> Result<Option<Vec<Message>>, ChannelError> {
+fn recv_all(
+    rx: &std::sync::mpsc::Receiver<Message>,
+    timeout: Duration,
+) -> Result<Option<Vec<Message>>, ChannelError> {
     match rx.recv_timeout(timeout) {
         Ok(message) => {
             let mut messages = vec![message];
@@ -513,12 +516,14 @@ fn recv_all(rx: &std::sync::mpsc::Receiver<Message>, timeout: Duration) -> Resul
 
             while !quit {
                 match rx.try_recv() {
-                    Ok(message) => { messages.push(message) },
-                    Err(mpsc::TryRecvError::Empty) => { quit = true; },
+                    Ok(message) => messages.push(message),
+                    Err(mpsc::TryRecvError::Empty) => {
+                        quit = true;
+                    }
                     Err(mpsc::TryRecvError::Disconnected) => {
                         quit = true;
                         disconnected = true;
-                    },
+                    }
                 }
             }
 
@@ -527,12 +532,12 @@ fn recv_all(rx: &std::sync::mpsc::Receiver<Message>, timeout: Duration) -> Resul
             } else {
                 Ok(Some(messages))
             }
-        },
+        }
 
         Err(err) => match err {
             RecvTimeoutError::Timeout => Ok(None),
             RecvTimeoutError::Disconnected => Err(ChannelError::Disconnected),
-        }
+        },
     }
 }
 
@@ -734,13 +739,16 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
                             .push(Source::SymphoniaSource(StreamState::Streaming, sf)),
                     }
                 }
-            },
+            }
 
             Ok(None) => (),
             Err(ChannelError::Disconnected) => {
-                log::log!(log::Level::Error, "Message channel disconnected, shutting down");
-                break
-            },
+                log::log!(
+                    log::Level::Error,
+                    "Message channel disconnected, shutting down"
+                );
+                break;
+            }
         }
 
         if quit {

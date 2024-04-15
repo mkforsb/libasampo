@@ -1,5 +1,5 @@
 // MIT License
-// 
+//
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
 use std::fs::File;
@@ -36,7 +36,7 @@ pub trait IO: Clone {
 pub struct DefaultIO();
 
 #[cfg(test)]
-mockall::mock!{
+mockall::mock! {
     pub IO { }
 
     impl IO for IO {
