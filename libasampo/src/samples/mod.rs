@@ -2,9 +2,10 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SampleMetadata {
     pub rate: u32,
     pub channels: u8,
@@ -18,7 +19,7 @@ pub trait SampleTrait {
     fn source_uuid(&self) -> Option<&Uuid>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BasicSample {
     uri: String,
     name: String,
@@ -61,7 +62,7 @@ impl SampleTrait for BasicSample {
 }
 
 // TODO: use enum-dispatch
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Sample {
     BasicSample(BasicSample),
 
