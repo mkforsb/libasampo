@@ -1,13 +1,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::sources::{
-    file_system_source::{
-        io::{DefaultIO, IO},
-        FilesystemSource as RealFilesystemSource,
-    },
-    Source as RealSource,
-};
+use crate::sources;
+use crate::sources::file_system_source as fs_source;
 
 pub trait IntoDomain<T> {
     fn into_domain(self) -> T;
@@ -23,17 +18,21 @@ pub struct FilesystemSourceV1 {
     enabled: bool,
 }
 
-impl IntoDomain<RealSource> for FilesystemSourceV1 {
-    fn into_domain(self) -> RealSource {
-        let mut src =
-            RealFilesystemSource::new_with_io(self.name, self.path, self.exts, DefaultIO());
+impl IntoDomain<sources::Source> for FilesystemSourceV1 {
+    fn into_domain(self) -> sources::Source {
+        let mut src = fs_source::FilesystemSource::new_with_io(
+            self.name,
+            self.path,
+            self.exts,
+            fs_source::io::DefaultIO(),
+        );
         src.set_uuid(self.uuid);
-        RealSource::FilesystemSource(src)
+        sources::Source::FilesystemSource(src)
     }
 }
 
-impl<T: IO> From<RealFilesystemSource<T>> for FilesystemSourceV1 {
-    fn from(src: RealFilesystemSource<T>) -> Self {
+impl<T: fs_source::io::IO> From<fs_source::FilesystemSource<T>> for FilesystemSourceV1 {
+    fn from(src: fs_source::FilesystemSource<T>) -> Self {
         FilesystemSourceV1 {
             name: src.name.clone(),
             uuid: src.uuid,
@@ -50,26 +49,26 @@ pub enum Source {
     FilesystemSourceV1(FilesystemSourceV1),
 }
 
-impl IntoDomain<RealSource> for Source {
-    fn into_domain(self) -> RealSource {
+impl IntoDomain<sources::Source> for Source {
+    fn into_domain(self) -> sources::Source {
         match self {
             Source::FilesystemSourceV1(src) => src.into_domain(),
         }
     }
 }
 
-impl From<RealSource> for Source {
-    fn from(value: RealSource) -> Self {
+impl From<sources::Source> for Source {
+    fn from(value: sources::Source) -> Self {
         match value {
-            RealSource::FilesystemSource(src) => {
+            sources::Source::FilesystemSource(src) => {
                 Source::FilesystemSourceV1(FilesystemSourceV1::from(src))
             }
 
             #[cfg(feature = "mocks")]
-            RealSource::MockSource(_) => unimplemented!(),
+            sources::Source::MockSource(_) => unimplemented!(),
 
             #[cfg(feature = "fakes")]
-            RealSource::FakeSource(_) => unimplemented!(),
+            sources::Source::FakeSource(_) => unimplemented!(),
         }
     }
 }
@@ -113,7 +112,7 @@ mod tests {
         }
 
         match domained {
-            RealSource::FilesystemSource(domained_src) => {
+            sources::Source::FilesystemSource(domained_src) => {
                 assert_eq!(domained_src.name(), name.as_deref());
                 assert_eq!(domained_src.uuid(), &uuid);
                 assert_eq!(domained_src.uri(), uri);
@@ -121,10 +120,10 @@ mod tests {
             }
 
             #[cfg(feature = "mocks")]
-            RealSource::MockSource(_) => unimplemented!(),
+            sources::Source::MockSource(_) => unimplemented!(),
 
             #[cfg(feature = "fakes")]
-            RealSource::FakeSource(_) => unimplemented!(),
+            sources::Source::FakeSource(_) => unimplemented!(),
         }
     }
 }
