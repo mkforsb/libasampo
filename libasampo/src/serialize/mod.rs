@@ -125,7 +125,7 @@ impl From<sources::Source> for Source {
             sources::Source::MockSource(_) => unimplemented!(),
 
             #[cfg(feature = "fakes")]
-            sources::Source::FakeSource(_) => unimplemented!(),
+            sources::Source::FakeSource(src) => Source::FakeSourceV1(FakeSourceV1::from(src)),
         }
     }
 }
