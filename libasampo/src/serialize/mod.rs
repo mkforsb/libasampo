@@ -1,8 +1,14 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[cfg(feature = "fakes")]
+use std::collections::HashMap;
+
 use crate::sources;
 use crate::sources::file_system_source as fs_source;
+
+#[cfg(feature = "fakes")]
+use crate::samples::Sample;
 
 pub trait IntoDomain<T> {
     fn into_domain(self) -> T;
@@ -44,15 +50,66 @@ impl<T: fs_source::io::IO> From<fs_source::FilesystemSource<T>> for FilesystemSo
     }
 }
 
+#[cfg(feature = "fakes")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FakeSourceV1 {
+    pub name: Option<String>,
+    pub uri: String,
+    pub uuid: Uuid,
+    pub list: Vec<Sample>,
+    pub stream: HashMap<Sample, Vec<f32>>,
+    pub enabled: bool,
+}
+
+#[cfg(feature = "fakes")]
+impl IntoDomain<sources::Source> for FakeSourceV1 {
+    fn into_domain(self) -> sources::Source {
+        sources::Source::FakeSource(sources::FakeSource {
+            name: self.name,
+            uri: self.uri,
+            uuid: self.uuid,
+            list: self.list,
+            list_error: None,
+            stream: self.stream,
+            stream_error: None,
+            enabled: self.enabled,
+        })
+    }
+}
+
+#[cfg(feature = "fakes")]
+impl From<sources::FakeSource> for FakeSourceV1 {
+    fn from(value: sources::FakeSource) -> Self {
+        if value.list_error.is_some() || value.stream_error.is_some() {
+            panic!("Cannot serialize fake source with errors");
+        }
+
+        FakeSourceV1 {
+            name: value.name,
+            uri: value.uri,
+            uuid: value.uuid,
+            list: value.list,
+            stream: value.stream,
+            enabled: value.enabled,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Source {
     FilesystemSourceV1(FilesystemSourceV1),
+
+    #[cfg(feature = "fakes")]
+    FakeSourceV1(FakeSourceV1),
 }
 
 impl IntoDomain<sources::Source> for Source {
     fn into_domain(self) -> sources::Source {
         match self {
             Source::FilesystemSourceV1(src) => src.into_domain(),
+
+            #[cfg(feature = "fakes")]
+            Source::FakeSourceV1(src) => src.into_domain(),
         }
     }
 }
@@ -109,6 +166,9 @@ mod tests {
                 assert_eq!(decoded_src.exts, exts);
                 assert_eq!(decoded_src.enabled, enabled);
             }
+
+            #[cfg(feature = "fakes")]
+            Source::FakeSourceV1(_decoded_src) => unimplemented!(),
         }
 
         match domained {
