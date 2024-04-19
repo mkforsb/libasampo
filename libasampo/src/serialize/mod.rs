@@ -64,6 +64,12 @@ impl From<RealSource> for Source {
             RealSource::FilesystemSource(src) => {
                 Source::FilesystemSourceV1(FilesystemSourceV1::from(src))
             }
+
+            #[cfg(feature = "mocks")]
+            RealSource::MockSource(_) => unimplemented!(),
+
+            #[cfg(feature = "fakes")]
+            RealSource::FakeSource(_) => unimplemented!(),
         }
     }
 }
@@ -113,6 +119,12 @@ mod tests {
                 assert_eq!(domained_src.uri(), uri);
                 assert_eq!(domained_src.is_enabled(), enabled);
             }
+
+            #[cfg(feature = "mocks")]
+            RealSource::MockSource(_) => unimplemented!(),
+
+            #[cfg(feature = "fakes")]
+            RealSource::FakeSource(_) => unimplemented!(),
         }
     }
 }
