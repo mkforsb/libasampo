@@ -2,7 +2,7 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 use std::collections::HashMap;
 
 use std::fs::File;
@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::errors::Error;
 use crate::samples::Sample;
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 use crate::samples::SampleTrait;
 
 pub mod file_system_source;
@@ -124,7 +124,7 @@ mockall::mock! {
     }
 }
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 #[derive(PartialEq)]
 pub struct FakeSource {
     pub name: Option<String>,
@@ -144,7 +144,7 @@ pub enum Source {
     #[cfg(feature = "mocks")]
     MockSource(MockSource),
 
-    #[cfg(feature = "fakes")]
+    #[cfg(any(test, feature = "fakes"))]
     FakeSource(FakeSource),
 }
 
@@ -156,7 +156,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.name(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => src.name.as_ref().map(|x| x.as_str()),
         }
     }
@@ -167,7 +167,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.uri(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => &src.uri,
         }
     }
@@ -179,7 +179,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.uuid(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => &src.uuid,
         }
     }
@@ -191,7 +191,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.list(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => match &src.list_error {
                 Some(error) => Err(error()),
                 None => Ok(src.list.clone()),
@@ -206,7 +206,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.stream(sample),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => match &src.stream_error {
                 Some(error) => Err(error()),
                 None => match src.stream.get(sample) {
@@ -227,7 +227,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.is_enabled(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => src.enabled,
         }
     }
@@ -239,7 +239,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.set_enabled(enabled),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => src.enabled = enabled,
         }
     }
@@ -251,7 +251,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.enable(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => src.enabled = true,
         }
     }
@@ -263,7 +263,7 @@ impl SourceTrait for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => src.disable(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => src.enabled = false,
         }
     }
@@ -277,7 +277,7 @@ impl Clone for Source {
             #[cfg(feature = "mocks")]
             Self::MockSource(src) => Self::MockSource(src.clone()),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => Self::FakeSource(FakeSource {
                 name: src.name.clone(),
                 uri: src.uri.clone(),
@@ -306,10 +306,10 @@ impl std::cmp::PartialEq for Source {
             #[cfg(feature = "mocks")]
             (Self::MockSource(left), Self::MockSource(right)) => left == right,
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             (Self::FakeSource(left), Self::FakeSource(right)) => left == right,
 
-            #[cfg(any(feature = "mocks", feature = "fakes"))]
+            #[cfg(any(test, feature = "mocks", feature = "fakes"))]
             _ => false,
         }
     }

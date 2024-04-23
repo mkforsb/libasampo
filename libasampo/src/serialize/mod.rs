@@ -5,13 +5,13 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 use std::collections::HashMap;
 
 use crate::sources;
 use crate::sources::file_system_source as fs_source;
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 use crate::samples::Sample;
 
 pub trait IntoDomain<T> {
@@ -54,7 +54,7 @@ impl<T: fs_source::io::IO> From<fs_source::FilesystemSource<T>> for FilesystemSo
     }
 }
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FakeSourceV1 {
     pub name: Option<String>,
@@ -65,7 +65,7 @@ pub struct FakeSourceV1 {
     pub enabled: bool,
 }
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 impl IntoDomain<sources::Source> for FakeSourceV1 {
     fn into_domain(self) -> sources::Source {
         sources::Source::FakeSource(sources::FakeSource {
@@ -81,7 +81,7 @@ impl IntoDomain<sources::Source> for FakeSourceV1 {
     }
 }
 
-#[cfg(feature = "fakes")]
+#[cfg(any(test, feature = "fakes"))]
 impl From<sources::FakeSource> for FakeSourceV1 {
     fn from(value: sources::FakeSource) -> Self {
         if value.list_error.is_some() || value.stream_error.is_some() {
@@ -103,7 +103,7 @@ impl From<sources::FakeSource> for FakeSourceV1 {
 pub enum Source {
     FilesystemSourceV1(FilesystemSourceV1),
 
-    #[cfg(feature = "fakes")]
+    #[cfg(any(test, feature = "fakes"))]
     FakeSourceV1(FakeSourceV1),
 }
 
@@ -112,7 +112,7 @@ impl IntoDomain<sources::Source> for Source {
         match self {
             Source::FilesystemSourceV1(src) => src.into_domain(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Source::FakeSourceV1(src) => src.into_domain(),
         }
     }
@@ -128,7 +128,7 @@ impl From<sources::Source> for Source {
             #[cfg(feature = "mocks")]
             sources::Source::MockSource(_) => unimplemented!(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             sources::Source::FakeSource(src) => Source::FakeSourceV1(FakeSourceV1::from(src)),
         }
     }
@@ -150,7 +150,7 @@ mod tests {
 
         let x = Source::FilesystemSourceV1(FilesystemSourceV1 {
             name: name.clone(),
-            uuid: uuid.clone(),
+            uuid,
             path: path.clone(),
             uri: uri.clone(),
             exts: exts.clone(),
@@ -171,7 +171,7 @@ mod tests {
                 assert_eq!(decoded_src.enabled, enabled);
             }
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             Source::FakeSourceV1(_decoded_src) => unimplemented!(),
         }
 
@@ -186,7 +186,7 @@ mod tests {
             #[cfg(feature = "mocks")]
             sources::Source::MockSource(_) => unimplemented!(),
 
-            #[cfg(feature = "fakes")]
+            #[cfg(any(test, feature = "fakes"))]
             sources::Source::FakeSource(_) => unimplemented!(),
         }
     }
