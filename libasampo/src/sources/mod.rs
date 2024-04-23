@@ -158,7 +158,7 @@ impl SourceTrait for Source {
             Self::MockSource(src) => src.name(),
 
             #[cfg(any(test, feature = "fakes"))]
-            Self::FakeSource(src) => src.name.as_ref().map(|x| x.as_str()),
+            Self::FakeSource(src) => src.name.as_deref(),
         }
     }
     fn uri(&self) -> &str {
@@ -284,9 +284,9 @@ impl Clone for Source {
                 uri: src.uri.clone(),
                 uuid: src.uuid,
                 list: src.list.clone(),
-                list_error: src.list_error.clone(),
+                list_error: src.list_error,
                 stream: src.stream.clone(),
-                stream_error: src.stream_error.clone(),
+                stream_error: src.stream_error,
                 enabled: src.enabled,
             }),
         }

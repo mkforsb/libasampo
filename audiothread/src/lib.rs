@@ -1018,9 +1018,9 @@ mod tests {
         ))
         .unwrap();
 
-        while let Some(_) = sf.next() {}
+        for _ in sf.by_ref() {}
 
-        assert_eq!(sf.eof, true);
+        assert!(sf.eof);
     }
 
     #[test]
@@ -1063,10 +1063,10 @@ mod tests {
         let mut buffer = [0.0; 40];
 
         mix(&mut src1, &mut buffer);
-        assert_eq!(true, buffer.iter().all(|x| *x == 0.0));
+        assert!(buffer.iter().all(|x| *x == 0.0));
 
         mix(&mut src2, &mut buffer);
-        assert_eq!(false, buffer.iter().all(|x| *x == 0.0));
+        assert!(!buffer.iter().all(|x| *x == 0.0));
     }
 
     #[test]
