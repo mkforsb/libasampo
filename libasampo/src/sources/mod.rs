@@ -214,7 +214,7 @@ impl SourceTrait for Source {
                     Some(vec) => Ok(SourceReader::VecReader(vec.clone(), 0)),
                     None => Err(Error::IoError {
                         uri: sample.uri().to_string(),
-                        details: String::from("???"),
+                        details: String::from("Not found! (in FakeSource HashMap)"),
                     }),
                 },
             },
