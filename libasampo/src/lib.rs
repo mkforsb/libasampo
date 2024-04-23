@@ -6,6 +6,7 @@ pub mod audiohash;
 pub mod errors;
 pub mod prelude;
 pub mod samples;
+pub mod samplesets;
 pub mod serialize;
 pub mod sources;
 pub mod testutils;

@@ -19,6 +19,9 @@ pub enum Error {
 
     #[error("Source error: \"{uri}\" is not a valid URI for \"{source_type}\"")]
     SourceInvalidUriError { uri: String, source_type: String },
+
+    #[error("Sample set error: sample \"{uri}\" is not present")]
+    SampleSetSampleNotPresentError { uri: String },
 }
 
 impl Error {
