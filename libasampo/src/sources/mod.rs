@@ -20,6 +20,7 @@ pub mod file_system_source;
 
 pub trait SourceReaderTrait: Read + Seek {}
 
+#[derive(Debug)]
 pub enum SourceReader {
     FileReader(File),
     VecReader(Vec<f32>, usize),
