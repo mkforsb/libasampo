@@ -14,6 +14,9 @@ pub enum Error {
     #[error("Symphonia error: {0}")]
     SymphoniaError(#[from] symphonia::core::errors::Error),
 
+    #[error("Symphonia error: No default track")]
+    SymphoniaNoDefaultTrackError,
+
     #[error("Source error: \"{uri}\" is not a valid URI for \"{source_type}\"")]
     SourceInvalidUriError { uri: String, source_type: String },
 }
