@@ -100,6 +100,7 @@ pub trait SampleSetTrait {
     fn add(&mut self, source: &Source, sample: &Sample) -> Result<(), Error>;
     fn remove(&mut self, sample: &Sample) -> Result<(), Error>;
     fn contains(&self, sample: &Sample) -> bool;
+    fn is_empty(&self) -> bool;
     fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str>;
 }
 
@@ -184,6 +185,10 @@ impl SampleSetTrait for BaseSampleSet {
 
     fn contains(&self, sample: &Sample) -> bool {
         self.samples.contains(sample)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.samples.is_empty()
     }
 
     fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str> {
