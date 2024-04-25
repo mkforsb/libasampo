@@ -295,7 +295,15 @@ impl Clone for Source {
 
 impl std::fmt::Debug for Source {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Source")
+        match self {
+            Source::FilesystemSource(_) => f.write_str("FilesystemSource"),
+
+            #[cfg(feature = "mocks")]
+            Source::MockSource(_) => f.write_str("MockSource"),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Source::FakeSource(fakesource) => fakesource.fmt(f),
+        }
     }
 }
 
