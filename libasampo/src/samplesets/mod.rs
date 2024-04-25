@@ -262,3 +262,164 @@ impl SampleSetTrait for SampleSet {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // TODO: why must `sample` be imported here, but not `fakesource`?
+    use crate::testutils::{self, fakesource_from_json, sample, sample_from_json};
+
+    use super::*;
+
+    #[test]
+    fn test_new_empty() {
+        let mut samples = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
+
+        assert_eq!(samples.name(), "My Samples");
+        assert!(samples.list().is_empty());
+        assert!(samples.labelling().is_none());
+        assert!(samples.remove(&testutils::sample!()).is_err());
+        assert!(!samples.contains(&testutils::sample!()));
+        assert!(samples.is_empty());
+        assert!(samples
+            .cached_audio_hash_of(&testutils::sample!())
+            .is_none());
+    }
+
+    #[test]
+    fn test_add_contains_not_empty_and_hash() {
+        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok("abc123".to_string())));
+
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
+        let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
+
+        assert!(set.add(&source, &source.list().unwrap()[0]).is_ok());
+        assert!(set.contains(&source.list().unwrap()[0]));
+        assert!(!set.is_empty());
+
+        assert_eq!(
+            set.cached_audio_hash_of(&source.list().unwrap()[0]),
+            Some("abc123")
+        );
+    }
+
+    #[test]
+    fn test_list_sorted_by_uri() {
+        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok("abc123".to_string())));
+
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
+        let source = testutils::fakesource!(
+            json = r#"{ "list": [{"uri": "3.wav"}, {"uri": "1.wav"}, {"uri": "2.wav"}] }"#
+        );
+
+        set.add(&source, &source.list().unwrap()[0]).unwrap();
+        set.add(&source, &source.list().unwrap()[1]).unwrap();
+        set.add(&source, &source.list().unwrap()[2]).unwrap();
+
+        assert_eq!(
+            set.list()
+                .iter()
+                .map(|sample| sample.uri())
+                .collect::<Vec<_>>(),
+            vec!["1.wav", "2.wav", "3.wav"]
+        );
+    }
+
+    #[test]
+    fn test_add_labelling() {
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
+
+        match &mut set {
+            SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
+                SampleSetLabelling::DrumPadLabelling(DrumPadLabelling::new()),
+            )),
+        }
+
+        assert!(match set.labelling() {
+            Some(SampleSetLabelling::DrumPadLabelling(_)) => true,
+            None => false,
+        })
+    }
+
+    #[test]
+    fn test_add_label() {
+        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok("abc123".to_string())));
+
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
+        let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
+
+        set.add(&source, &source.list().unwrap()[0]).unwrap();
+
+        match &mut set {
+            SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
+                SampleSetLabelling::DrumPadLabelling(DrumPadLabelling::new()),
+            )),
+        }
+
+        assert!(!set
+            .labelling()
+            .unwrap()
+            .has_label_for(&source.list().unwrap()[0]));
+
+        if let Some(SampleSetLabelling::DrumPadLabelling(labels)) = set.labelling_mut() {
+            labels.set(&source.list().unwrap()[0], DrumPadLabel::Clap);
+        }
+
+        assert!(set
+            .labelling()
+            .unwrap()
+            .has_label_for(&source.list().unwrap()[0]));
+
+        assert_eq!(
+            match set.labelling() {
+                Some(SampleSetLabelling::DrumPadLabelling(labels)) =>
+                    labels.get(&source.list().unwrap()[0]),
+                None => None,
+            },
+            Some(DrumPadLabel::Clap).as_ref()
+        );
+    }
+
+    #[test]
+    fn test_remove() {
+        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok("abc123".to_string())));
+
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
+        let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
+
+        set.add(&source, &source.list().unwrap()[0]).unwrap();
+
+        assert!(set.remove(&source.list().unwrap()[0]).is_ok());
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn test_remove_leads_to_hash_and_label_removed() {
+        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok("abc123".to_string())));
+
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
+        let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
+
+        set.add(&source, &source.list().unwrap()[0]).unwrap();
+
+        match &mut set {
+            SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
+                SampleSetLabelling::DrumPadLabelling(DrumPadLabelling::new()),
+            )),
+        }
+
+        if let Some(SampleSetLabelling::DrumPadLabelling(labels)) = set.labelling_mut() {
+            labels.set(&source.list().unwrap()[0], DrumPadLabel::Clap);
+        }
+
+        set.remove(&source.list().unwrap()[0]).unwrap();
+
+        assert!(set
+            .cached_audio_hash_of(&source.list().unwrap()[0])
+            .is_none());
+
+        assert!(!set
+            .labelling()
+            .unwrap()
+            .has_label_for(&source.list().unwrap()[0]));
+    }
+}
