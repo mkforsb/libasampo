@@ -200,3 +200,65 @@ impl SampleSetTrait for BaseSampleSet {
 pub enum SampleSet {
     BaseSampleSet(BaseSampleSet),
 }
+
+impl SampleSetTrait for SampleSet {
+    fn uuid(&self) -> &Uuid {
+        match self {
+            Self::BaseSampleSet(set) => set.uuid(),
+        }
+    }
+
+    fn name(&self) -> &str {
+        match self {
+            Self::BaseSampleSet(set) => set.name(),
+        }
+    }
+
+    fn list(&self) -> Vec<&Sample> {
+        match self {
+            Self::BaseSampleSet(set) => set.list(),
+        }
+    }
+
+    fn labelling(&self) -> Option<&SampleSetLabelling> {
+        match self {
+            Self::BaseSampleSet(set) => set.labelling(),
+        }
+    }
+
+    fn labelling_mut(&mut self) -> Option<&mut SampleSetLabelling> {
+        match self {
+            Self::BaseSampleSet(set) => set.labelling_mut(),
+        }
+    }
+
+    fn add(&mut self, source: &Source, sample: &Sample) -> Result<(), Error> {
+        match self {
+            Self::BaseSampleSet(set) => set.add(source, sample),
+        }
+    }
+
+    fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
+        match self {
+            Self::BaseSampleSet(set) => set.remove(sample),
+        }
+    }
+
+    fn contains(&self, sample: &Sample) -> bool {
+        match self {
+            Self::BaseSampleSet(set) => set.contains(sample),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::BaseSampleSet(set) => set.is_empty(),
+        }
+    }
+
+    fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str> {
+        match self {
+            Self::BaseSampleSet(set) => set.cached_audio_hash_of(sample),
+        }
+    }
+}
