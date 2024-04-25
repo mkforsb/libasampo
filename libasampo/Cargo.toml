@@ -8,6 +8,7 @@ mocks = ["dep:mockall"]
 fakes = []
 
 [dev-dependencies]
+json = "0.12.4"
 mockall = { version = "0.12.1" }
 
 [dependencies]
