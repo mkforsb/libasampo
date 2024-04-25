@@ -126,14 +126,14 @@ mockall::mock! {
 }
 
 #[cfg(any(test, feature = "fakes"))]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct FakeSource {
     pub name: Option<String>,
     pub uri: String,
     pub uuid: Uuid,
     pub list: Vec<Sample>,
     pub list_error: Option<fn() -> Error>,
-    pub stream: HashMap<Sample, Vec<f32>>,
+    pub stream: HashMap<String, Vec<f32>>,
     pub stream_error: Option<fn() -> Error>,
     pub enabled: bool,
 }
@@ -210,7 +210,7 @@ impl SourceTrait for Source {
             #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => match &src.stream_error {
                 Some(error) => Err(error()),
-                None => match src.stream.get(sample) {
+                None => match src.stream.get(sample.uri()) {
                     Some(vec) => Ok(SourceReader::VecReader(vec.clone(), 0)),
                     None => Err(Error::IoError {
                         uri: sample.uri().to_string(),

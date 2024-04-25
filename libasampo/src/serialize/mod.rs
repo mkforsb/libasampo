@@ -61,7 +61,7 @@ pub struct FakeSourceV1 {
     pub uri: String,
     pub uuid: Uuid,
     pub list: Vec<Sample>,
-    pub stream: HashMap<Sample, Vec<f32>>,
+    pub stream: HashMap<String, Vec<f32>>,
     pub enabled: bool,
 }
 
