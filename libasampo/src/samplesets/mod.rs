@@ -18,7 +18,7 @@ use crate::audiohash::audio_hash;
 #[cfg(test)]
 use crate::testutils::audiohash_for_test::audio_hash;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DrumPadLabel {
     BassDrum,
     Rimshot,
