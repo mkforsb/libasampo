@@ -2,7 +2,6 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
-#[cfg(test)]
 pub mod audiohash_for_test {
     use std::cell::Cell;
 

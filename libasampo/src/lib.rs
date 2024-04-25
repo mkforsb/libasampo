@@ -9,4 +9,6 @@ pub mod samples;
 pub mod samplesets;
 pub mod serialize;
 pub mod sources;
-pub mod testutils;
+
+#[cfg(test)]
+mod testutils;
