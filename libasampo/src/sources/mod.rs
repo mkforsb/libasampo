@@ -42,7 +42,8 @@ impl Read for SourceReader {
                     unsafe {
                         let (_, buf_f32, _) = buf.align_to_mut::<f32>();
                         let floats_to_write = core::cmp::min(buf_f32.len(), v.len() - *pos);
-                        buf_f32.copy_from_slice(&v[*pos..(*pos + floats_to_write)]);
+                        buf_f32[..floats_to_write]
+                            .copy_from_slice(&v[*pos..(*pos + floats_to_write)]);
                         *pos += buf_f32.len();
                         Ok(4 * floats_to_write)
                     }
