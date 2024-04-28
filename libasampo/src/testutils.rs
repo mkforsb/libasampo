@@ -215,4 +215,104 @@ macro_rules! fakesource {
 
 pub(crate) use fakesource;
 
-// TODO: test the json testutils a bit, partly as form of documentation
+#[cfg(test)]
+mod tests {
+    use std::io::Read;
+
+    use crate::prelude::{SampleTrait, SourceTrait};
+
+    use super::*;
+
+    #[test]
+    fn test_sample_from_json() {
+        assert_eq!(sample!(json = r#"{ "uri": "abc123" }"#).uri(), "abc123");
+        assert_eq!(sample!(json = r#"{ "name": "456xyz" }"#).name(), "456xyz");
+
+        let sample = sample!(
+            json = r#"{
+            "rate": 12345,
+            "channels": 42,
+            "fmt": "use the fourcc oggi-wav",
+            "srcuuid": "12345678-9012-3456-7890-123456789012"
+        }"#
+        );
+
+        assert_eq!(sample.metadata().rate, 12345);
+        assert_eq!(sample.metadata().channels, 42);
+        assert_eq!(sample.metadata().src_fmt_display, "use the fourcc oggi-wav");
+
+        assert_eq!(
+            sample.source_uuid(),
+            Some(uuid::Uuid::parse_str("12345678-9012-3456-7890-123456789012").unwrap()).as_ref()
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sample_from_json_value_error() {
+        sample!(json = r#"{"rate": []}"#);
+    }
+
+    #[test]
+    fn test_fakesource_from_json_basics() {
+        assert!(fakesource!().name().is_some());
+        assert_eq!(fakesource!(json = r#"{"name": false}"#).name(), None);
+        assert_eq!(fakesource!(json = r#"{"name": "x"}"#).name(), Some("x"));
+
+        assert_eq!(fakesource!(json = r#"{"uri": "y"}"#).uri(), "y");
+
+        assert_eq!(
+            fakesource!(json = r#"{"uuid": "10000000-2000-3000-4000-500000000000"}"#).uuid(),
+            &uuid::Uuid::parse_str("10000000-2000-3000-4000-500000000000").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_fakesource_from_json_samples_stream_manual() {
+        assert!(fakesource!(json = r#"{ "list": [] }"#)
+            .list()
+            .unwrap()
+            .is_empty());
+
+        let source = fakesource!(
+            json = r#"{
+            "list": [{"uri": "1.wav", "rate": 999}, {"uri": "2.wav"}],
+            "stream": {"1.wav": [1,1,1], "2.wav": [2,2,2,2]}
+        }"#
+        );
+
+        assert_eq!(source.list().unwrap().len(), 2);
+        assert_eq!(source.list().unwrap().first().unwrap().uri(), "1.wav");
+        assert_eq!(source.list().unwrap().get(1).unwrap().uri(), "2.wav");
+
+        assert!(source
+            .stream(source.list().unwrap().first().unwrap())
+            .is_ok());
+
+        assert_eq!(
+            source
+                .stream(source.list().unwrap().get(1).unwrap())
+                .unwrap()
+                .read_to_end(&mut Vec::new())
+                .unwrap(),
+            16
+        );
+    }
+
+    #[test]
+    fn test_fakesource_from_json_samples_stream_auto() {
+        let source = fakesource!(
+            json = r#"{
+            "list": [{"uri": "1.wav", "rate": 999}, {"uri": "2.wav"}]
+        }"#
+        );
+
+        assert!(source
+            .stream(source.list().unwrap().first().unwrap())
+            .is_ok());
+
+        assert!(source
+            .stream(source.list().unwrap().get(1).unwrap())
+            .is_ok());
+    }
+}
