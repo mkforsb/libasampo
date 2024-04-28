@@ -139,62 +139,41 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
 
     let all_nums = |x: &json::Array| x.iter().all(|y| matches!(y, json::JsonValue::Number(_)));
 
-    let valid_stream_entry = |x: &json::JsonValue| match x {
-        json::JsonValue::Array(y) => {
-            y.len() == 2
-                && match (&y[0], &y[1]) {
-                    (json::JsonValue::Short(_), json::JsonValue::Array(vals)) if all_nums(vals) => {
-                        true
-                    }
-                    (json::JsonValue::String(_), json::JsonValue::Array(vals))
-                        if all_nums(vals) =>
-                    {
-                        true
-                    }
-                    _ => false,
-                }
-        }
-        _ => false,
+    let valid_stream_entries = |obj: &json::object::Object| {
+        obj.iter()
+            .all(|(_key, val)| matches!(val, json::JsonValue::Array(vals) if all_nums(vals)))
     };
 
     let stream = match &json["stream"] {
-        json::JsonValue::Array(arr) if arr.iter().all(valid_stream_entry) => arr
+        json::JsonValue::Object(obj) if valid_stream_entries(obj) => obj
             .iter()
-            .map(|x| match x {
-                json::JsonValue::Array(entry) => (
-                    entry[0].to_string(),
-                    match &entry[1] {
-                        json::JsonValue::Array(vals) => vals
-                            .iter()
-                            .map(|val| match val {
-                                json::JsonValue::Number(num) => {
-                                    let (positive, mantissa, exponent) = num.as_parts();
+            .map(|(key, val)| match val {
+                json::JsonValue::Array(vals) => (
+                    key.to_string(),
+                    vals.iter()
+                        .map(|val| match val {
+                            json::JsonValue::Number(num) => {
+                                let (positive, mantissa, exponent) = num.as_parts();
 
-                                    if positive {
-                                        (mantissa as f32).powi(exponent.into())
-                                    } else {
-                                        (-(mantissa as f32)).powi(exponent.into())
-                                    }
+                                if positive {
+                                    (mantissa as f32).powi(exponent.into())
+                                } else {
+                                    (-(mantissa as f32)).powi(exponent.into())
                                 }
-                                _ => panic!(),
-                            })
-                            .collect(),
-                        _ => panic!(),
-                    },
+                            }
+                            _ => panic!(),
+                        })
+                        .collect(),
                 ),
                 _ => panic!(),
             })
             .collect(),
-        json::JsonValue::Null => match &json["list"] {
-            json::JsonValue::Null => HashMap::new(),
-            _ => list
-                .iter()
-                .map(|sample| (sample.uri().to_string(), vec![]))
-                .collect(),
-        },
-        _ => panic!(
-            "fakesource_from_json: invalid value for `stream` (valid: [[String, [Number*]]*])"
-        ),
+        json::JsonValue::Null if list.is_empty() => HashMap::new(),
+        json::JsonValue::Null => list
+            .iter()
+            .map(|sample| (sample.uri().to_string(), vec![]))
+            .collect(),
+        _ => panic!(),
     };
 
     let enabled = match &json["enabled"] {
@@ -223,7 +202,7 @@ macro_rules! fakesource {
                 "uri": "default_uri",
                 "uuid": "00000000-0000-0000-0000-000000000000",
                 "list": [],
-                "stream": [],
+                "stream": {},
                 "enabled": true
             }"#
         )
