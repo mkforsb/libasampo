@@ -6,9 +6,6 @@ use samples::SampleTrait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[cfg(any(test, feature = "fakes"))]
-use std::collections::HashMap;
-
 use crate::sources::file_system_source as fs_source;
 use crate::{samples, sources};
 
@@ -112,66 +109,15 @@ impl<T: fs_source::io::IO> From<fs_source::FilesystemSource<T>> for FilesystemSo
     }
 }
 
-#[cfg(any(test, feature = "fakes"))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FakeSourceV1 {
-    pub name: Option<String>,
-    pub uri: String,
-    pub uuid: Uuid,
-    pub list: Vec<Sample>,
-    pub stream: HashMap<String, Vec<f32>>,
-    pub enabled: bool,
-}
-
-#[cfg(any(test, feature = "fakes"))]
-impl IntoDomain<sources::Source> for FakeSourceV1 {
-    fn into_domain(self) -> sources::Source {
-        sources::Source::FakeSource(sources::FakeSource {
-            name: self.name,
-            uri: self.uri,
-            uuid: self.uuid,
-            list: self.list.into_iter().map(|x| x.into_domain()).collect(),
-            list_error: None,
-            stream: self.stream,
-            stream_error: None,
-            enabled: self.enabled,
-        })
-    }
-}
-
-#[cfg(any(test, feature = "fakes"))]
-impl From<sources::FakeSource> for FakeSourceV1 {
-    fn from(value: sources::FakeSource) -> Self {
-        if value.list_error.is_some() || value.stream_error.is_some() {
-            panic!("Cannot serialize fake source with errors");
-        }
-
-        FakeSourceV1 {
-            name: value.name,
-            uri: value.uri,
-            uuid: value.uuid,
-            list: value.list.into_iter().map(|x| Sample::from(x)).collect(),
-            stream: value.stream,
-            enabled: value.enabled,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Source {
     FilesystemSourceV1(FilesystemSourceV1),
-
-    #[cfg(any(test, feature = "fakes"))]
-    FakeSourceV1(FakeSourceV1),
 }
 
 impl IntoDomain<sources::Source> for Source {
     fn into_domain(self) -> sources::Source {
         match self {
             Source::FilesystemSourceV1(src) => src.into_domain(),
-
-            #[cfg(any(test, feature = "fakes"))]
-            Source::FakeSourceV1(src) => src.into_domain(),
         }
     }
 }
@@ -187,7 +133,7 @@ impl From<sources::Source> for Source {
             sources::Source::MockSource(_) => unimplemented!(),
 
             #[cfg(any(test, feature = "fakes"))]
-            sources::Source::FakeSource(src) => Source::FakeSourceV1(FakeSourceV1::from(src)),
+            sources::Source::FakeSource(_) => unimplemented!(),
         }
     }
 }
@@ -268,9 +214,8 @@ mod tests {
 
         let encoded = serde_json::to_string(&x).unwrap();
         let decoded = serde_json::from_str::<Source>(&encoded).unwrap();
-        let domained = decoded.clone().into_domain();
 
-        match decoded {
+        match &decoded {
             Source::FilesystemSourceV1(decoded_src) => {
                 assert_eq!(decoded_src.name, name);
                 assert_eq!(decoded_src.uuid, uuid);
@@ -280,9 +225,11 @@ mod tests {
                 assert_eq!(decoded_src.enabled, enabled);
             }
 
-            #[cfg(any(test, feature = "fakes"))]
-            Source::FakeSourceV1(_decoded_src) => unimplemented!(),
+            #[allow(unreachable_patterns)]
+            _ => panic!(),
         }
+
+        let domained = decoded.clone().into_domain();
 
         match domained {
             sources::Source::FilesystemSource(domained_src) => {
@@ -292,11 +239,7 @@ mod tests {
                 assert_eq!(domained_src.is_enabled(), enabled);
             }
 
-            #[cfg(feature = "mocks")]
-            sources::Source::MockSource(_) => unimplemented!(),
-
-            #[cfg(any(test, feature = "fakes"))]
-            sources::Source::FakeSource(_) => unimplemented!(),
+            _ => panic!(),
         }
     }
 }
