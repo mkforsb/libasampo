@@ -2,20 +2,78 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
+use samples::SampleTrait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[cfg(any(test, feature = "fakes"))]
 use std::collections::HashMap;
 
-use crate::sources;
 use crate::sources::file_system_source as fs_source;
-
-#[cfg(any(test, feature = "fakes"))]
-use crate::samples::Sample;
+use crate::{samples, sources};
 
 pub trait IntoDomain<T> {
     fn into_domain(self) -> T;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BasicSampleV1 {
+    uri: String,
+    name: String,
+    rate: u32,
+    channels: u8,
+    format: String,
+    source_uuid: Option<Uuid>,
+}
+
+impl IntoDomain<samples::Sample> for BasicSampleV1 {
+    fn into_domain(self) -> samples::Sample {
+        samples::Sample::BasicSample(samples::BasicSample::new(
+            self.uri,
+            self.name,
+            samples::SampleMetadata {
+                rate: self.rate,
+                channels: self.channels,
+                src_fmt_display: self.format,
+            },
+            self.source_uuid,
+        ))
+    }
+}
+
+impl From<samples::BasicSample> for BasicSampleV1 {
+    fn from(value: samples::BasicSample) -> Self {
+        BasicSampleV1 {
+            uri: value.uri().to_string(),
+            name: value.name().to_string(),
+            rate: value.metadata().rate,
+            channels: value.metadata().channels,
+            format: value.metadata().src_fmt_display.clone(),
+            source_uuid: value.source_uuid().copied(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Sample {
+    BasicSampleV1(BasicSampleV1),
+}
+
+impl IntoDomain<samples::Sample> for Sample {
+    fn into_domain(self) -> samples::Sample {
+        match self {
+            Self::BasicSampleV1(x) => x.into_domain(),
+        }
+    }
+}
+
+impl From<samples::Sample> for Sample {
+    fn from(value: samples::Sample) -> Self {
+        match value {
+            samples::Sample::BasicSample(x) => Sample::BasicSampleV1(BasicSampleV1::from(x)),
+            samples::Sample::DefaultSample => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +130,7 @@ impl IntoDomain<sources::Source> for FakeSourceV1 {
             name: self.name,
             uri: self.uri,
             uuid: self.uuid,
-            list: self.list,
+            list: self.list.into_iter().map(|x| x.into_domain()).collect(),
             list_error: None,
             stream: self.stream,
             stream_error: None,
@@ -92,7 +150,7 @@ impl From<sources::FakeSource> for FakeSourceV1 {
             name: value.name,
             uri: value.uri,
             uuid: value.uuid,
-            list: value.list,
+            list: value.list.into_iter().map(|x| Sample::from(x)).collect(),
             stream: value.stream,
             enabled: value.enabled,
         }
@@ -138,6 +196,57 @@ impl From<sources::Source> for Source {
 mod tests {
     use super::*;
     use crate::sources::SourceTrait;
+
+    #[test]
+    fn test_basicsample() {
+        let uri = String::from("file:///sample.wav");
+        let name = String::from("sample.wav");
+        let rate = 12345;
+        let channels = 7;
+        let format = String::from("SuperPCM");
+        let source_uuid = uuid::uuid!("10000001-2002-3003-4004-500000000005");
+
+        let x = Sample::BasicSampleV1(BasicSampleV1 {
+            uri: uri.clone(),
+            name: name.clone(),
+            rate,
+            channels,
+            format: format.clone(),
+            source_uuid: Some(source_uuid),
+        });
+
+        let encoded = serde_json::to_string(&x).unwrap();
+        let decoded = serde_json::from_str::<Sample>(&encoded).unwrap();
+
+        match &decoded {
+            Sample::BasicSampleV1(s) => {
+                assert_eq!(s.uri, uri);
+                assert_eq!(s.name, name);
+                assert_eq!(s.rate, rate);
+                assert_eq!(s.channels, channels);
+                assert_eq!(s.format, format);
+                assert_eq!(s.source_uuid, Some(source_uuid));
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => panic!(),
+        }
+
+        let domained = decoded.clone().into_domain();
+
+        match domained {
+            samples::Sample::BasicSample(s) => {
+                assert_eq!(s.uri(), uri);
+                assert_eq!(s.name(), name);
+                assert_eq!(s.metadata().rate, rate);
+                assert_eq!(s.metadata().channels, channels);
+                assert_eq!(s.metadata().src_fmt_display, format);
+                assert_eq!(s.source_uuid(), Some(source_uuid).as_ref());
+            }
+
+            _ => panic!(),
+        }
+    }
 
     #[test]
     fn test_fs_source() {
