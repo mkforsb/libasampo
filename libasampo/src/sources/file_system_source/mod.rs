@@ -64,7 +64,7 @@ where
 
     pub fn sample_from_path(&self, path: &Path) -> Result<Sample, Error> {
         match (self.io.is_file(path), path.to_str()) {
-            (true, Some(s)) => Ok(Sample::BasicSample(BaseSample::new(
+            (true, Some(s)) => Ok(Sample::BaseSample(BaseSample::new(
                 format!("file://{s}"),
                 path.file_name()
                     .and_then(|name| name.to_str())

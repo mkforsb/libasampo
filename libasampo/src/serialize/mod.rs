@@ -14,7 +14,7 @@ pub trait IntoDomain<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicSampleV1 {
+pub struct BaseSampleV1 {
     uri: String,
     name: String,
     rate: u32,
@@ -23,9 +23,9 @@ pub struct BasicSampleV1 {
     source_uuid: Option<Uuid>,
 }
 
-impl IntoDomain<samples::Sample> for BasicSampleV1 {
+impl IntoDomain<samples::Sample> for BaseSampleV1 {
     fn into_domain(self) -> samples::Sample {
-        samples::Sample::BasicSample(samples::BaseSample::new(
+        samples::Sample::BaseSample(samples::BaseSample::new(
             self.uri,
             self.name,
             samples::SampleMetadata {
@@ -38,9 +38,9 @@ impl IntoDomain<samples::Sample> for BasicSampleV1 {
     }
 }
 
-impl From<samples::BaseSample> for BasicSampleV1 {
+impl From<samples::BaseSample> for BaseSampleV1 {
     fn from(value: samples::BaseSample) -> Self {
-        BasicSampleV1 {
+        BaseSampleV1 {
             uri: value.uri().to_string(),
             name: value.name().to_string(),
             rate: value.metadata().rate,
@@ -53,13 +53,13 @@ impl From<samples::BaseSample> for BasicSampleV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Sample {
-    BasicSampleV1(BasicSampleV1),
+    BaseSampleV1(BaseSampleV1),
 }
 
 impl IntoDomain<samples::Sample> for Sample {
     fn into_domain(self) -> samples::Sample {
         match self {
-            Self::BasicSampleV1(x) => x.into_domain(),
+            Self::BaseSampleV1(x) => x.into_domain(),
         }
     }
 }
@@ -67,7 +67,7 @@ impl IntoDomain<samples::Sample> for Sample {
 impl From<samples::Sample> for Sample {
     fn from(value: samples::Sample) -> Self {
         match value {
-            samples::Sample::BasicSample(x) => Sample::BasicSampleV1(BasicSampleV1::from(x)),
+            samples::Sample::BaseSample(x) => Sample::BaseSampleV1(BaseSampleV1::from(x)),
             samples::Sample::DefaultSample => unimplemented!(),
         }
     }
@@ -152,7 +152,7 @@ mod tests {
         let format = String::from("SuperPCM");
         let source_uuid = uuid::uuid!("10000001-2002-3003-4004-500000000005");
 
-        let x = Sample::BasicSampleV1(BasicSampleV1 {
+        let x = Sample::BaseSampleV1(BaseSampleV1 {
             uri: uri.clone(),
             name: name.clone(),
             rate,
@@ -165,7 +165,7 @@ mod tests {
         let decoded = serde_json::from_str::<Sample>(&encoded).unwrap();
 
         match &decoded {
-            Sample::BasicSampleV1(s) => {
+            Sample::BaseSampleV1(s) => {
                 assert_eq!(s.uri, uri);
                 assert_eq!(s.name, name);
                 assert_eq!(s.rate, rate);
@@ -181,7 +181,7 @@ mod tests {
         let domained = decoded.clone().into_domain();
 
         match domained {
-            samples::Sample::BasicSample(s) => {
+            samples::Sample::BaseSample(s) => {
                 assert_eq!(s.uri(), uri);
                 assert_eq!(s.name(), name);
                 assert_eq!(s.metadata().rate, rate);

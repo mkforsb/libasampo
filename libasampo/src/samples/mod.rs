@@ -63,7 +63,7 @@ impl SampleTrait for BaseSample {
 // TODO: use enum-dispatch
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub enum Sample {
-    BasicSample(BaseSample),
+    BaseSample(BaseSample),
 
     #[default]
     DefaultSample,
@@ -72,28 +72,28 @@ pub enum Sample {
 impl SampleTrait for Sample {
     fn uri(&self) -> &str {
         match self {
-            Self::BasicSample(s) => s.uri(),
+            Self::BaseSample(s) => s.uri(),
             Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn name(&self) -> &str {
         match self {
-            Self::BasicSample(s) => s.name(),
+            Self::BaseSample(s) => s.name(),
             Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn metadata(&self) -> &SampleMetadata {
         match self {
-            Self::BasicSample(s) => s.metadata(),
+            Self::BaseSample(s) => s.metadata(),
             Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn source_uuid(&self) -> Option<&Uuid> {
         match self {
-            Self::BasicSample(s) => s.source_uuid(),
+            Self::BaseSample(s) => s.source_uuid(),
             Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
@@ -101,6 +101,6 @@ impl SampleTrait for Sample {
 
 impl From<BaseSample> for Sample {
     fn from(sample: BaseSample) -> Self {
-        Sample::BasicSample(sample)
+        Sample::BaseSample(sample)
     }
 }
