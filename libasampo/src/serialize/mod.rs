@@ -6,11 +6,12 @@ use samples::SampleTrait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::errors::Error;
 use crate::sources::file_system_source as fs_source;
 use crate::{samples, sources};
 
-pub trait IntoDomain<T> {
-    fn into_domain(self) -> T;
+pub trait TryIntoDomain<T> {
+    fn try_into_domain(self) -> Result<T, Error>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,9 +24,9 @@ pub struct BaseSampleV1 {
     source_uuid: Option<Uuid>,
 }
 
-impl IntoDomain<samples::Sample> for BaseSampleV1 {
-    fn into_domain(self) -> samples::Sample {
-        samples::Sample::BaseSample(samples::BaseSample::new(
+impl TryIntoDomain<samples::Sample> for BaseSampleV1 {
+    fn try_into_domain(self) -> Result<samples::Sample, Error> {
+        Ok(samples::Sample::BaseSample(samples::BaseSample::new(
             self.uri,
             self.name,
             samples::SampleMetadata {
@@ -34,20 +35,22 @@ impl IntoDomain<samples::Sample> for BaseSampleV1 {
                 src_fmt_display: self.format,
             },
             self.source_uuid,
-        ))
+        )))
     }
 }
 
-impl From<samples::BaseSample> for BaseSampleV1 {
-    fn from(value: samples::BaseSample) -> Self {
-        BaseSampleV1 {
+impl TryFrom<samples::BaseSample> for BaseSampleV1 {
+    type Error = crate::errors::Error;
+
+    fn try_from(value: samples::BaseSample) -> Result<Self, Self::Error> {
+        Ok(BaseSampleV1 {
             uri: value.uri().to_string(),
             name: value.name().to_string(),
             rate: value.metadata().rate,
             channels: value.metadata().channels,
             format: value.metadata().src_fmt_display.clone(),
             source_uuid: value.source_uuid().copied(),
-        }
+        })
     }
 }
 
@@ -56,19 +59,23 @@ pub enum Sample {
     BaseSampleV1(BaseSampleV1),
 }
 
-impl IntoDomain<samples::Sample> for Sample {
-    fn into_domain(self) -> samples::Sample {
+impl TryIntoDomain<samples::Sample> for Sample {
+    fn try_into_domain(self) -> Result<samples::Sample, Error> {
         match self {
-            Self::BaseSampleV1(x) => x.into_domain(),
+            Self::BaseSampleV1(x) => x.try_into_domain(),
         }
     }
 }
 
-impl From<samples::Sample> for Sample {
-    fn from(value: samples::Sample) -> Self {
+impl TryFrom<samples::Sample> for Sample {
+    type Error = crate::errors::Error;
+
+    fn try_from(value: samples::Sample) -> Result<Self, Self::Error> {
         match value {
-            samples::Sample::BaseSample(x) => Sample::BaseSampleV1(BaseSampleV1::from(x)),
-            samples::Sample::DefaultSample => unimplemented!(),
+            samples::Sample::BaseSample(x) => Ok(Sample::BaseSampleV1(BaseSampleV1::try_from(x)?)),
+            samples::Sample::DefaultSample => Err(Error::DeserializationError(
+                "De/serialization not supported for DefaultSample".to_string(),
+            )),
         }
     }
 }
@@ -83,8 +90,8 @@ pub struct FilesystemSourceV1 {
     enabled: bool,
 }
 
-impl IntoDomain<sources::Source> for FilesystemSourceV1 {
-    fn into_domain(self) -> sources::Source {
+impl TryIntoDomain<sources::Source> for FilesystemSourceV1 {
+    fn try_into_domain(self) -> Result<sources::Source, Error> {
         let mut src = fs_source::FilesystemSource::new_with_io(
             self.name,
             self.path,
@@ -92,20 +99,22 @@ impl IntoDomain<sources::Source> for FilesystemSourceV1 {
             fs_source::io::DefaultIO(),
         );
         src.set_uuid(self.uuid);
-        sources::Source::FilesystemSource(src)
+        Ok(sources::Source::FilesystemSource(src))
     }
 }
 
-impl<T: fs_source::io::IO> From<fs_source::FilesystemSource<T>> for FilesystemSourceV1 {
-    fn from(src: fs_source::FilesystemSource<T>) -> Self {
-        FilesystemSourceV1 {
+impl<T: fs_source::io::IO> TryFrom<fs_source::FilesystemSource<T>> for FilesystemSourceV1 {
+    type Error = crate::errors::Error;
+
+    fn try_from(src: fs_source::FilesystemSource<T>) -> Result<Self, Self::Error> {
+        Ok(FilesystemSourceV1 {
             name: src.name.clone(),
             uuid: src.uuid,
             path: src.path.clone(),
             uri: src.uri.clone(),
             exts: src.exts.clone(),
             enabled: src.enabled,
-        }
+        })
     }
 }
 
@@ -114,26 +123,28 @@ pub enum Source {
     FilesystemSourceV1(FilesystemSourceV1),
 }
 
-impl IntoDomain<sources::Source> for Source {
-    fn into_domain(self) -> sources::Source {
+impl TryIntoDomain<sources::Source> for Source {
+    fn try_into_domain(self) -> Result<sources::Source, Error> {
         match self {
-            Source::FilesystemSourceV1(src) => src.into_domain(),
+            Source::FilesystemSourceV1(src) => src.try_into_domain(),
         }
     }
 }
 
-impl From<sources::Source> for Source {
-    fn from(value: sources::Source) -> Self {
+impl TryFrom<sources::Source> for Source {
+    type Error = crate::errors::Error;
+
+    fn try_from(value: sources::Source) -> Result<Self, Error> {
         match value {
             sources::Source::FilesystemSource(src) => {
-                Source::FilesystemSourceV1(FilesystemSourceV1::from(src))
+                Ok(Source::FilesystemSourceV1(FilesystemSourceV1::try_from(src)?))
             }
 
             #[cfg(feature = "mocks")]
-            sources::Source::MockSource(_) => unimplemented!(),
+            sources::Source::MockSource(_) => Err(Error::SerializationError("De/serialization not supported for MockSource".to_string())),
 
             #[cfg(any(test, feature = "fakes"))]
-            sources::Source::FakeSource(_) => unimplemented!(),
+            sources::Source::FakeSource(_) => Err(Error::SerializationError("De/serialization not supported for FakeSource".to_string()))
         }
     }
 }
@@ -178,7 +189,7 @@ mod tests {
             _ => panic!(),
         }
 
-        let domained = decoded.clone().into_domain();
+        let domained = decoded.clone().try_into_domain().unwrap();
 
         match domained {
             samples::Sample::BaseSample(s) => {
@@ -229,7 +240,7 @@ mod tests {
             _ => panic!(),
         }
 
-        let domained = decoded.clone().into_domain();
+        let domained = decoded.clone().try_into_domain().unwrap();
 
         match domained {
             sources::Source::FilesystemSource(domained_src) => {

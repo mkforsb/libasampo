@@ -22,6 +22,12 @@ pub enum Error {
 
     #[error("Sample set error: sample \"{uri}\" is not present")]
     SampleSetSampleNotPresentError { uri: String },
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Deserialization error: {0}")]
+    DeserializationError(String),
 }
 
 impl Error {
