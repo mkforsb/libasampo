@@ -25,7 +25,7 @@ pub struct BasicSampleV1 {
 
 impl IntoDomain<samples::Sample> for BasicSampleV1 {
     fn into_domain(self) -> samples::Sample {
-        samples::Sample::BasicSample(samples::BasicSample::new(
+        samples::Sample::BasicSample(samples::BaseSample::new(
             self.uri,
             self.name,
             samples::SampleMetadata {
@@ -38,8 +38,8 @@ impl IntoDomain<samples::Sample> for BasicSampleV1 {
     }
 }
 
-impl From<samples::BasicSample> for BasicSampleV1 {
-    fn from(value: samples::BasicSample) -> Self {
+impl From<samples::BaseSample> for BasicSampleV1 {
+    fn from(value: samples::BaseSample) -> Self {
         BasicSampleV1 {
             uri: value.uri().to_string(),
             name: value.name().to_string(),

@@ -62,7 +62,7 @@ pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample
         _ => panic!("sample_from_json: invalid value for `srcuuid` (valid: String)"),
     };
 
-    crate::samples::Sample::BasicSample(crate::samples::BasicSample::new(
+    crate::samples::Sample::BasicSample(crate::samples::BaseSample::new(
         uri,
         name,
         crate::samples::SampleMetadata {

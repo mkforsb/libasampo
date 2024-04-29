@@ -19,21 +19,21 @@ pub trait SampleTrait {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BasicSample {
+pub struct BaseSample {
     uri: String,
     name: String,
     metadata: SampleMetadata,
     source_uuid: Option<Uuid>,
 }
 
-impl BasicSample {
+impl BaseSample {
     pub fn new(
         uri: String,
         name: String,
         metadata: SampleMetadata,
         source_uuid: Option<Uuid>,
-    ) -> BasicSample {
-        BasicSample {
+    ) -> BaseSample {
+        BaseSample {
             uri,
             name,
             metadata,
@@ -42,7 +42,7 @@ impl BasicSample {
     }
 }
 
-impl SampleTrait for BasicSample {
+impl SampleTrait for BaseSample {
     fn uri(&self) -> &str {
         &self.uri
     }
@@ -63,7 +63,7 @@ impl SampleTrait for BasicSample {
 // TODO: use enum-dispatch
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub enum Sample {
-    BasicSample(BasicSample),
+    BasicSample(BaseSample),
 
     #[default]
     DefaultSample,
@@ -99,8 +99,8 @@ impl SampleTrait for Sample {
     }
 }
 
-impl From<BasicSample> for Sample {
-    fn from(sample: BasicSample) -> Self {
+impl From<BaseSample> for Sample {
+    fn from(sample: BaseSample) -> Self {
         Sample::BasicSample(sample)
     }
 }
