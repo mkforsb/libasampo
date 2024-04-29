@@ -19,7 +19,7 @@ use crate::audiohash::audio_hash;
 use crate::testutils::audiohash_for_test::audio_hash;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DrumPadLabel {
+pub enum DrumkitLabel {
     BassDrum,
     Rimshot,
     Snare,
@@ -34,19 +34,19 @@ pub enum DrumPadLabel {
 }
 
 #[derive(Clone, Debug)]
-pub struct DrumPadLabelling {
-    labels: HashMap<String, DrumPadLabel>,
+pub struct DrumkitLabelling {
+    labels: HashMap<String, DrumkitLabel>,
 }
 
-impl Default for DrumPadLabelling {
+impl Default for DrumkitLabelling {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl DrumPadLabelling {
+impl DrumkitLabelling {
     pub fn new() -> Self {
-        DrumPadLabelling {
+        DrumkitLabelling {
             labels: HashMap::new(),
         }
     }
@@ -55,11 +55,11 @@ impl DrumPadLabelling {
         self.labels.clear();
     }
 
-    pub fn get(&self, sample: &Sample) -> Option<&DrumPadLabel> {
+    pub fn get(&self, sample: &Sample) -> Option<&DrumkitLabel> {
         self.labels.get(sample.uri())
     }
 
-    pub fn set(&mut self, sample: &Sample, label: DrumPadLabel) {
+    pub fn set(&mut self, sample: &Sample, label: DrumkitLabel) {
         self.labels.insert(sample.uri().to_string(), label);
     }
 
@@ -75,18 +75,18 @@ impl DrumPadLabelling {
 
 #[derive(Clone, Debug)]
 pub enum SampleSetLabelling {
-    DrumPadLabelling(DrumPadLabelling),
+    DrumkitLabelling(DrumkitLabelling),
 }
 
 impl SampleSetLabelling {
     pub fn has_label_for(&self, sample: &Sample) -> bool {
         match self {
-            Self::DrumPadLabelling(labels) => labels.get(sample).is_some(),
+            Self::DrumkitLabelling(labels) => labels.get(sample).is_some(),
         }
     }
     pub fn remove_label_for(&mut self, sample: &Sample) -> Result<(), Error> {
         match self {
-            Self::DrumPadLabelling(labels) => labels.remove(sample),
+            Self::DrumkitLabelling(labels) => labels.remove(sample),
         }
     }
 }
@@ -330,12 +330,12 @@ mod tests {
 
         match &mut set {
             SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
-                SampleSetLabelling::DrumPadLabelling(DrumPadLabelling::new()),
+                SampleSetLabelling::DrumkitLabelling(DrumkitLabelling::new()),
             )),
         }
 
         assert!(match set.labelling() {
-            Some(SampleSetLabelling::DrumPadLabelling(_)) => true,
+            Some(SampleSetLabelling::DrumkitLabelling(_)) => true,
             None => false,
         })
     }
@@ -351,7 +351,7 @@ mod tests {
 
         match &mut set {
             SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
-                SampleSetLabelling::DrumPadLabelling(DrumPadLabelling::new()),
+                SampleSetLabelling::DrumkitLabelling(DrumkitLabelling::new()),
             )),
         }
 
@@ -360,8 +360,8 @@ mod tests {
             .unwrap()
             .has_label_for(&source.list().unwrap()[0]));
 
-        if let Some(SampleSetLabelling::DrumPadLabelling(labels)) = set.labelling_mut() {
-            labels.set(&source.list().unwrap()[0], DrumPadLabel::Clap);
+        if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
+            labels.set(&source.list().unwrap()[0], DrumkitLabel::Clap);
         }
 
         assert!(set
@@ -371,11 +371,11 @@ mod tests {
 
         assert_eq!(
             match set.labelling() {
-                Some(SampleSetLabelling::DrumPadLabelling(labels)) =>
+                Some(SampleSetLabelling::DrumkitLabelling(labels)) =>
                     labels.get(&source.list().unwrap()[0]),
                 None => None,
             },
-            Some(DrumPadLabel::Clap).as_ref()
+            Some(DrumkitLabel::Clap).as_ref()
         );
     }
 
@@ -403,12 +403,12 @@ mod tests {
 
         match &mut set {
             SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
-                SampleSetLabelling::DrumPadLabelling(DrumPadLabelling::new()),
+                SampleSetLabelling::DrumkitLabelling(DrumkitLabelling::new()),
             )),
         }
 
-        if let Some(SampleSetLabelling::DrumPadLabelling(labels)) = set.labelling_mut() {
-            labels.set(&source.list().unwrap()[0], DrumPadLabel::Clap);
+        if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
+            labels.set(&source.list().unwrap()[0], DrumkitLabel::Clap);
         }
 
         set.remove(&source.list().unwrap()[0]).unwrap();
