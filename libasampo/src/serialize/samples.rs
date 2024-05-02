@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{errors::Error, samples::SampleTrait, serialize::TryIntoDomain};
+use crate::{errors::Error, samples::SampleOps, serialize::TryIntoDomain};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BaseSampleV1 {

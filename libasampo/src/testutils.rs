@@ -98,7 +98,7 @@ pub(crate) use sample;
 pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::Source {
     use std::collections::HashMap;
 
-    use crate::prelude::SampleTrait;
+    use crate::prelude::SampleOps;
 
     let name = match &json["name"] {
         json::JsonValue::Boolean(b) => match b {
@@ -219,7 +219,7 @@ pub(crate) use fakesource;
 mod tests {
     use std::io::Read;
 
-    use crate::prelude::{SampleTrait, SourceTrait};
+    use crate::prelude::{SampleOps, SourceOps};
 
     use super::*;
 

@@ -92,7 +92,7 @@ where
     }
 }
 
-impl<T> SourceTrait for FilesystemSource<T>
+impl<T> SourceOps for FilesystemSource<T>
 where
     T: IO + std::fmt::Debug,
 {

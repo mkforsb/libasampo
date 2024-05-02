@@ -14,11 +14,11 @@ use crate::errors::Error;
 use crate::samples::Sample;
 
 #[cfg(any(test, feature = "fakes"))]
-use crate::samples::SampleTrait;
+use crate::samples::SampleOps;
 
 pub mod file_system_source;
 
-pub trait SourceReaderTrait: Read + Seek {}
+pub trait SourceReaderOps: Read + Seek {}
 
 #[derive(Debug)]
 pub enum SourceReader {
@@ -83,9 +83,9 @@ impl Seek for SourceReader {
     }
 }
 
-impl SourceReaderTrait for SourceReader {}
+impl SourceReaderOps for SourceReader {}
 
-pub trait SourceTrait: PartialEq + Clone + std::fmt::Debug {
+pub trait SourceOps: PartialEq + Clone + std::fmt::Debug {
     fn name(&self) -> Option<&str>;
     fn uri(&self) -> &str;
     fn uuid(&self) -> &Uuid;
@@ -101,7 +101,7 @@ pub trait SourceTrait: PartialEq + Clone + std::fmt::Debug {
 mockall::mock! {
     pub Source { }
 
-    impl SourceTrait for Source {
+    impl SourceOps for Source {
         fn name<'a>(&'a self) -> Option<&'a str>;
         fn uri(&self) -> &str;
         fn uuid(&self) -> &Uuid;
@@ -150,7 +150,7 @@ pub enum Source {
     FakeSource(FakeSource),
 }
 
-impl SourceTrait for Source {
+impl SourceOps for Source {
     fn name(&self) -> Option<&str> {
         match self {
             Self::FilesystemSource(src) => src.name(),

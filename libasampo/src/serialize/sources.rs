@@ -84,7 +84,7 @@ impl TryFrom<crate::sources::Source> for Source {
 mod tests {
     use super::*;
 
-    use crate::sources::SourceTrait;
+    use crate::sources::SourceOps;
 
     #[test]
     fn test_fs_source() {

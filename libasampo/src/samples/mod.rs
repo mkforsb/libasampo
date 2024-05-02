@@ -11,7 +11,7 @@ pub struct SampleMetadata {
     pub src_fmt_display: String,
 }
 
-pub trait SampleTrait {
+pub trait SampleOps {
     fn uri(&self) -> &str;
     fn name(&self) -> &str;
     fn metadata(&self) -> &SampleMetadata;
@@ -42,7 +42,7 @@ impl BaseSample {
     }
 }
 
-impl SampleTrait for BaseSample {
+impl SampleOps for BaseSample {
     fn uri(&self) -> &str {
         &self.uri
     }
@@ -69,7 +69,7 @@ pub enum Sample {
     DefaultSample,
 }
 
-impl SampleTrait for Sample {
+impl SampleOps for Sample {
     fn uri(&self) -> &str {
         match self {
             Self::BaseSample(s) => s.uri(),

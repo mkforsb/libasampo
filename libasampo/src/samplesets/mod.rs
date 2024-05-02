@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use crate::{
     errors::Error,
-    samples::{Sample, SampleTrait},
-    sources::{Source, SourceTrait},
+    samples::{Sample, SampleOps},
+    sources::{Source, SourceOps},
 };
 
 #[cfg(not(test))]
@@ -91,7 +91,7 @@ impl SampleSetLabelling {
     }
 }
 
-pub trait SampleSetTrait {
+pub trait SampleSetOps {
     fn uuid(&self) -> &Uuid;
     fn name(&self) -> &str;
     fn list(&self) -> Vec<&Sample>;
@@ -129,7 +129,7 @@ impl BaseSampleSet {
     }
 }
 
-impl SampleSetTrait for BaseSampleSet {
+impl SampleSetOps for BaseSampleSet {
     fn uuid(&self) -> &Uuid {
         &self.uuid
     }
@@ -201,7 +201,7 @@ pub enum SampleSet {
     BaseSampleSet(BaseSampleSet),
 }
 
-impl SampleSetTrait for SampleSet {
+impl SampleSetOps for SampleSet {
     fn uuid(&self) -> &Uuid {
         match self {
             Self::BaseSampleSet(set) => set.uuid(),
