@@ -120,9 +120,11 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
     };
 
     let uuid = match &json["uuid"] {
-        json::JsonValue::Short(s) => uuid::Uuid::parse_str(s.to_string().as_str()).unwrap(),
-        json::JsonValue::String(s) => uuid::Uuid::parse_str(s.to_string().as_str()).unwrap(),
-        json::JsonValue::Null => uuid::uuid!("00000000-0000-0000-0000-000000000000"),
+        json::JsonValue::Short(s) => uuid::Uuid::parse_str(s.to_string().as_str())
+            .expect("Should have been given a valid UUID string"),
+        json::JsonValue::String(s) => uuid::Uuid::parse_str(s.to_string().as_str())
+            .expect("Should have been given a valid UUID string"),
+        json::JsonValue::Null => uuid::Uuid::new_v4(),
         _ => panic!("fakesource_from_json: invalid value for `uuid` (valid: String)"),
     };
 
@@ -199,7 +201,6 @@ macro_rules! fakesource {
             json = r#"{
                 "name": "default_name",
                 "uri": "default_uri",
-                "uuid": "00000000-0000-0000-0000-000000000000",
                 "list": [],
                 "stream": {},
                 "enabled": true
