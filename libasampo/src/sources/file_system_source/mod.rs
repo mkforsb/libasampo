@@ -66,10 +66,9 @@ where
         match (self.io.is_file(path), path.to_str()) {
             (true, Some(s)) => Ok(Sample::BaseSample(BaseSample::new(
                 &SampleURI(format!("file://{s}")),
-                &path.file_name()
+                path.file_name()
                     .and_then(|name| name.to_str())
-                    .expect("file has valid UTF-8 name due to is_file and path.to_str")
-                    .to_string(),
+                    .expect("file has valid UTF-8 name due to is_file and path.to_str"),
                 &self.io.metadata(path)?,
                 Some(self.uuid),
             ))),
