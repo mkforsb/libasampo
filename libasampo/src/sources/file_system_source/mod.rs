@@ -88,7 +88,7 @@ where
     T: IO,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.uuid == other.uuid
+        (&self.name, &self.path, &self.uuid) == (&other.name, &other.path, &other.uuid)
     }
 }
 
