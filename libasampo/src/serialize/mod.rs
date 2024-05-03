@@ -5,9 +5,11 @@
 use crate::errors::Error;
 
 mod samples;
+mod samplesets;
 mod sources;
 
 pub use samples::Sample;
+pub use samplesets::SampleSet;
 pub use sources::Source;
 
 pub trait TryIntoDomain<T> {
