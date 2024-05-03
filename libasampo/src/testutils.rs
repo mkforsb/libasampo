@@ -170,9 +170,9 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
                                 let (positive, mantissa, exponent) = num.as_parts();
 
                                 if positive {
-                                    (mantissa as f32).powi(exponent.into())
+                                    (mantissa as f32) * 10.0f32.powi(exponent.into())
                                 } else {
-                                    (-(mantissa as f32)).powi(exponent.into())
+                                    (-(mantissa as f32)) * 10.0f32.powi(exponent.into())
                                 }
                             }
                             _ => panic!(),
@@ -232,7 +232,7 @@ use crate::samples::SampleURI;
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
+    use byteorder::{NativeEndian, ReadBytesExt};
 
     use crate::prelude::{SampleOps, SourceOps};
 
@@ -291,9 +291,9 @@ mod tests {
 
         let source = fakesource!(
             json = r#"{
-            "list": [{"uri": "1.wav", "rate": 999}, {"uri": "2.wav"}],
-            "stream": {"1.wav": [1,1,1], "2.wav": [2,2,2,2]}
-        }"#
+                "list": [{"uri": "1.wav", "rate": 999}, {"uri": "2.wav"}],
+                "stream": {"1.wav": [1,-1,1], "2.wav": [-2,2,-2,2]}
+            }"#
         );
 
         assert_eq!(source.list().unwrap().len(), 2);
@@ -311,12 +311,31 @@ mod tests {
             .is_ok());
 
         assert_eq!(
-            source
-                .stream(source.list().unwrap().get(1).unwrap())
-                .unwrap()
-                .read_to_end(&mut Vec::new())
-                .unwrap(),
-            16
+            {
+                let mut stream = source
+                    .stream(source.list().unwrap().first().unwrap())
+                    .unwrap();
+
+                (0..3)
+                    .into_iter()
+                    .map(|_| stream.read_f32::<NativeEndian>().unwrap())
+                    .collect::<Vec<_>>()
+            },
+            vec![1.0f32, -1.0f32, 1.0f32]
+        );
+
+        assert_eq!(
+            {
+                let mut stream = source
+                    .stream(source.list().unwrap().get(1).unwrap())
+                    .unwrap();
+
+                (0..4)
+                    .into_iter()
+                    .map(|_| stream.read_f32::<NativeEndian>().unwrap())
+                    .collect::<Vec<_>>()
+            },
+            vec![-2.0f32, 2.0f32, -2.0f32, 2.0f32]
         );
     }
 
