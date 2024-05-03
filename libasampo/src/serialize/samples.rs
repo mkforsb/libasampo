@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{errors::Error, samples::SampleOps, serialize::TryIntoDomain};
+use crate::{errors::Error, samples::{SampleOps, SampleURI}, serialize::TryIntoDomain};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BaseSampleV1 {
@@ -21,9 +21,9 @@ impl TryIntoDomain<crate::samples::Sample> for BaseSampleV1 {
     fn try_into_domain(self) -> Result<crate::samples::Sample, Error> {
         Ok(crate::samples::Sample::BaseSample(
             crate::samples::BaseSample::new(
-                self.uri,
-                self.name,
-                crate::samples::SampleMetadata {
+                &SampleURI(self.uri),
+                &self.name,
+                &crate::samples::SampleMetadata {
                     rate: self.rate,
                     channels: self.channels,
                     src_fmt_display: self.format,
@@ -120,7 +120,7 @@ mod tests {
 
         match domained {
             crate::samples::Sample::BaseSample(s) => {
-                assert_eq!(s.uri(), uri);
+                assert_eq!(s.uri(), uri.as_str());
                 assert_eq!(s.name(), name);
                 assert_eq!(s.metadata().rate, rate);
                 assert_eq!(s.metadata().channels, channels);

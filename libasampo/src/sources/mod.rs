@@ -211,7 +211,7 @@ impl SourceOps for Source {
             #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => match &src.stream_error {
                 Some(error) => Err(error()),
-                None => match src.stream.get(sample.uri()) {
+                None => match src.stream.get(sample.uri().as_str()) {
                     Some(vec) => Ok(SourceReader::VecReader(vec.clone(), 0)),
                     None => Err(Error::IoError {
                         uri: sample.uri().to_string(),

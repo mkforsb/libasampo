@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     errors::Error,
-    samples::{Sample, SampleOps},
+    samples::{Sample, SampleOps, SampleURI},
     sources::{Source, SourceOps},
 };
 
@@ -35,7 +35,7 @@ pub enum DrumkitLabel {
 
 #[derive(Clone, Debug)]
 pub struct DrumkitLabelling {
-    labels: HashMap<String, DrumkitLabel>,
+    labels: HashMap<SampleURI, DrumkitLabel>,
 }
 
 impl Default for DrumkitLabelling {
@@ -60,7 +60,7 @@ impl DrumkitLabelling {
     }
 
     pub fn set(&mut self, sample: &Sample, label: DrumkitLabel) {
-        self.labels.insert(sample.uri().to_string(), label);
+        self.labels.insert(sample.uri().clone(), label);
     }
 
     pub fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
@@ -110,7 +110,7 @@ pub struct BaseSampleSet {
     name: String,
     samples: HashSet<Sample>,
     labelling: Option<SampleSetLabelling>,
-    audio_hash: HashMap<String, String>,
+    audio_hash: HashMap<SampleURI, String>,
 }
 
 impl BaseSampleSet {
@@ -156,7 +156,7 @@ impl SampleSetOps for BaseSampleSet {
     fn add(&mut self, source: &Source, sample: &Sample) -> Result<(), Error> {
         self.samples.insert(sample.clone());
         self.audio_hash.insert(
-            sample.uri().to_string(),
+            sample.uri().clone(),
             audio_hash(source.stream(sample)?)?,
         );
 

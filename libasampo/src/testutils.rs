@@ -63,9 +63,9 @@ pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample
     };
 
     crate::samples::Sample::BaseSample(crate::samples::BaseSample::new(
-        uri,
-        name,
-        crate::samples::SampleMetadata {
+        &SampleURI(uri),
+        &name,
+        &crate::samples::SampleMetadata {
             rate,
             channels,
             src_fmt_display: fmt,
@@ -214,6 +214,8 @@ macro_rules! fakesource {
 }
 
 pub(crate) use fakesource;
+
+use crate::samples::SampleURI;
 
 #[cfg(test)]
 mod tests {

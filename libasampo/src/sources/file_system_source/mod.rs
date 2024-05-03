@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::errors::{Error, LogDiscard};
 use crate::prelude::*;
-use crate::samples::{BaseSample, Sample};
+use crate::samples::{BaseSample, Sample, SampleURI};
 
 pub mod io;
 
@@ -65,12 +65,12 @@ where
     pub fn sample_from_path(&self, path: &Path) -> Result<Sample, Error> {
         match (self.io.is_file(path), path.to_str()) {
             (true, Some(s)) => Ok(Sample::BaseSample(BaseSample::new(
-                format!("file://{s}"),
-                path.file_name()
+                &SampleURI(format!("file://{s}")),
+                &path.file_name()
                     .and_then(|name| name.to_str())
                     .expect("file has valid UTF-8 name due to is_file and path.to_str")
                     .to_string(),
-                self.io.metadata(path)?,
+                &self.io.metadata(path)?,
                 Some(self.uuid),
             ))),
             (false, Some(s)) => Err(Error::IoError(s, "Not a regular file")),

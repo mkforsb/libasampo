@@ -2,6 +2,8 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
+use std::ops::Deref;
+
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -11,8 +13,25 @@ pub struct SampleMetadata {
     pub src_fmt_display: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SampleURI(pub String);
+
+impl Deref for SampleURI {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl PartialEq<str> for SampleURI {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
 pub trait SampleOps {
-    fn uri(&self) -> &str;
+    fn uri(&self) -> &SampleURI;
     fn name(&self) -> &str;
     fn metadata(&self) -> &SampleMetadata;
     fn source_uuid(&self) -> Option<&Uuid>;
@@ -20,7 +39,7 @@ pub trait SampleOps {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BaseSample {
-    uri: String,
+    uri: SampleURI,
     name: String,
     metadata: SampleMetadata,
     source_uuid: Option<Uuid>,
@@ -28,22 +47,22 @@ pub struct BaseSample {
 
 impl BaseSample {
     pub fn new(
-        uri: String,
-        name: String,
-        metadata: SampleMetadata,
+        uri: &SampleURI,
+        name: &str,
+        metadata: &SampleMetadata,
         source_uuid: Option<Uuid>,
     ) -> BaseSample {
         BaseSample {
-            uri,
-            name,
-            metadata,
+            uri: SampleURI(uri.to_string()),
+            name: name.to_string(),
+            metadata: metadata.clone(),
             source_uuid,
         }
     }
 }
 
 impl SampleOps for BaseSample {
-    fn uri(&self) -> &str {
+    fn uri(&self) -> &SampleURI {
         &self.uri
     }
 
@@ -70,7 +89,7 @@ pub enum Sample {
 }
 
 impl SampleOps for Sample {
-    fn uri(&self) -> &str {
+    fn uri(&self) -> &SampleURI {
         match self {
             Self::BaseSample(s) => s.uri(),
             Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
