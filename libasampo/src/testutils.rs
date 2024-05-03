@@ -291,7 +291,7 @@ mod tests {
 
         let source = fakesource!(
             json = r#"{
-                "list": [{"uri": "1.wav", "rate": 999}, {"uri": "2.wav"}],
+                "list": [{"uri": "1.wav"}, {"uri": "2.wav"}],
                 "stream": {"1.wav": [1,-1,1], "2.wav": [-2,2,-2,2]}
             }"#
         );
@@ -343,8 +343,8 @@ mod tests {
     fn test_fakesource_from_json_samples_stream_auto() {
         let source = fakesource!(
             json = r#"{
-            "list": [{"uri": "1.wav", "rate": 999}, {"uri": "2.wav"}]
-        }"#
+                "list": [{"uri": "1.wav"}, {"uri": "2.wav"}]
+            }"#
         );
 
         assert!(source
