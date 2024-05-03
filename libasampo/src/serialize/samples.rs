@@ -5,7 +5,11 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{errors::Error, samples::{SampleOps, SampleURI}, serialize::TryIntoDomain};
+use crate::{
+    errors::Error,
+    samples::SampleOps,
+    serialize::{TryFromDomain, TryIntoDomain},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BaseSampleV1 {
@@ -17,27 +21,23 @@ pub struct BaseSampleV1 {
     source_uuid: Option<Uuid>,
 }
 
-impl TryIntoDomain<crate::samples::Sample> for BaseSampleV1 {
-    fn try_into_domain(self) -> Result<crate::samples::Sample, Error> {
-        Ok(crate::samples::Sample::BaseSample(
-            crate::samples::BaseSample::new(
-                &SampleURI(self.uri),
-                &self.name,
-                &crate::samples::SampleMetadata {
-                    rate: self.rate,
-                    channels: self.channels,
-                    src_fmt_display: self.format,
-                },
-                self.source_uuid,
-            ),
+impl TryIntoDomain<crate::samples::BaseSample> for BaseSampleV1 {
+    fn try_into_domain(self) -> Result<crate::samples::BaseSample, Error> {
+        Ok(crate::samples::BaseSample::new(
+            &crate::samples::SampleURI(self.uri),
+            &self.name,
+            &crate::samples::SampleMetadata {
+                rate: self.rate,
+                channels: self.channels,
+                src_fmt_display: self.format,
+            },
+            self.source_uuid,
         ))
     }
 }
 
-impl TryFrom<crate::samples::BaseSample> for BaseSampleV1 {
-    type Error = crate::errors::Error;
-
-    fn try_from(value: crate::samples::BaseSample) -> Result<Self, Self::Error> {
+impl TryFromDomain<crate::samples::BaseSample> for BaseSampleV1 {
+    fn try_from_domain(value: &crate::samples::BaseSample) -> Result<Self, Error> {
         Ok(BaseSampleV1 {
             uri: value.uri().to_string(),
             name: value.name().to_string(),
@@ -57,18 +57,16 @@ pub enum Sample {
 impl TryIntoDomain<crate::samples::Sample> for Sample {
     fn try_into_domain(self) -> Result<crate::samples::Sample, Error> {
         match self {
-            Self::BaseSampleV1(x) => x.try_into_domain(),
+            Self::BaseSampleV1(x) => Ok(crate::samples::Sample::BaseSample(x.try_into_domain()?)),
         }
     }
 }
 
-impl TryFrom<crate::samples::Sample> for Sample {
-    type Error = crate::errors::Error;
-
-    fn try_from(value: crate::samples::Sample) -> Result<Self, Self::Error> {
+impl TryFromDomain<crate::samples::Sample> for Sample {
+    fn try_from_domain(value: &crate::samples::Sample) -> Result<Self, Error> {
         match value {
             crate::samples::Sample::BaseSample(x) => {
-                Ok(Sample::BaseSampleV1(BaseSampleV1::try_from(x)?))
+                Ok(Sample::BaseSampleV1(BaseSampleV1::try_from_domain(x)?))
             }
             crate::samples::Sample::DefaultSample => Err(Error::DeserializationError(
                 "De/serialization not supported for DefaultSample".to_string(),

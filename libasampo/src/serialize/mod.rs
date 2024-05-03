@@ -7,9 +7,16 @@ use crate::errors::Error;
 mod samples;
 mod sources;
 
+pub use samples::Sample;
+pub use sources::Source;
+
 pub trait TryIntoDomain<T> {
     fn try_into_domain(self) -> Result<T, Error>;
 }
 
-pub use samples::Sample;
-pub use sources::Source;
+pub trait TryFromDomain<T> {
+    fn try_from_domain(value: &T) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+

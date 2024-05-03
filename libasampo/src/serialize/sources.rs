@@ -5,7 +5,11 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{errors::Error, serialize::TryIntoDomain, sources::file_system_source as fs_source};
+use crate::{
+    errors::Error,
+    serialize::{TryFromDomain, TryIntoDomain},
+    sources::file_system_source as fs_source,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FilesystemSourceV1 {
@@ -17,8 +21,10 @@ pub struct FilesystemSourceV1 {
     enabled: bool,
 }
 
-impl TryIntoDomain<crate::sources::Source> for FilesystemSourceV1 {
-    fn try_into_domain(self) -> Result<crate::sources::Source, Error> {
+impl TryIntoDomain<fs_source::FilesystemSource<fs_source::io::DefaultIO>> for FilesystemSourceV1 {
+    fn try_into_domain(
+        self,
+    ) -> Result<fs_source::FilesystemSource<fs_source::io::DefaultIO>, Error> {
         let mut src = fs_source::FilesystemSource::new_with_io(
             self.name,
             self.path,
@@ -26,14 +32,12 @@ impl TryIntoDomain<crate::sources::Source> for FilesystemSourceV1 {
             fs_source::io::DefaultIO(),
         );
         src.set_uuid(self.uuid);
-        Ok(crate::sources::Source::FilesystemSource(src))
+        Ok(src)
     }
 }
 
-impl<T: fs_source::io::IO> TryFrom<fs_source::FilesystemSource<T>> for FilesystemSourceV1 {
-    type Error = crate::errors::Error;
-
-    fn try_from(src: fs_source::FilesystemSource<T>) -> Result<Self, Self::Error> {
+impl<T: fs_source::io::IO> TryFromDomain<fs_source::FilesystemSource<T>> for FilesystemSourceV1 {
+    fn try_from_domain(src: &fs_source::FilesystemSource<T>) -> Result<Self, Error> {
         Ok(FilesystemSourceV1 {
             name: src.name.clone(),
             uuid: src.uuid,
@@ -53,18 +57,18 @@ pub enum Source {
 impl TryIntoDomain<crate::sources::Source> for Source {
     fn try_into_domain(self) -> Result<crate::sources::Source, Error> {
         match self {
-            Source::FilesystemSourceV1(src) => src.try_into_domain(),
+            Source::FilesystemSourceV1(src) => Ok(crate::sources::Source::FilesystemSource(
+                src.try_into_domain()?,
+            )),
         }
     }
 }
 
-impl TryFrom<crate::sources::Source> for Source {
-    type Error = crate::errors::Error;
-
-    fn try_from(value: crate::sources::Source) -> Result<Self, Error> {
+impl TryFromDomain<crate::sources::Source> for Source {
+    fn try_from_domain(value: &crate::sources::Source) -> Result<Self, Error> {
         match value {
             crate::sources::Source::FilesystemSource(src) => Ok(Source::FilesystemSourceV1(
-                FilesystemSourceV1::try_from(src)?,
+                FilesystemSourceV1::try_from_domain(src)?,
             )),
 
             #[cfg(feature = "mocks")]
