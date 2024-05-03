@@ -48,18 +48,18 @@ pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample
         _ => panic!("sample_from_json: invalid value for `channels` (valid: Number)"),
     };
 
-    let fmt = match &json["fmt"] {
+    let src_fmt_display = match &json["src_fmt_display"] {
         json::JsonValue::Short(s) => s.to_string(),
         json::JsonValue::String(s) => s.to_string(),
-        json::JsonValue::Null => "default_fmt".to_string(),
-        _ => panic!("sample_from_json: invalid value for `fmt` (valid: String)"),
+        json::JsonValue::Null => "default_src_fmt_display".to_string(),
+        _ => panic!("sample_from_json: invalid value for `src_fmt_display` (valid: String)"),
     };
 
-    let srcuuid = match &json["srcuuid"] {
+    let source_uuid = match &json["source_uuid"] {
         json::JsonValue::Short(s) => uuid::Uuid::parse_str(s.to_string().as_str()).unwrap(),
         json::JsonValue::String(s) => uuid::Uuid::parse_str(s.to_string().as_str()).unwrap(),
         json::JsonValue::Null => uuid::uuid!("00000000-0000-0000-0000-000000000000"),
-        _ => panic!("sample_from_json: invalid value for `srcuuid` (valid: String)"),
+        _ => panic!("sample_from_json: invalid value for `source_uuid` (valid: String)"),
     };
 
     crate::samples::Sample::BaseSample(crate::samples::BaseSample::new(
@@ -68,9 +68,9 @@ pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample
         &crate::samples::SampleMetadata {
             rate,
             channels,
-            src_fmt_display: fmt,
+            src_fmt_display,
         },
-        Some(srcuuid),
+        Some(source_uuid),
     ))
 }
 
@@ -82,7 +82,7 @@ macro_rules! sample {
                 "name": "default_name",
                 "rate": 44100,
                 "channels": 2,
-                "fmt": "default_fmt",
+                "src_fmt_display": "default_src_fmt_display",
                 "srcuuid": "00000000-0000-0000-0000-000000000000"
             }"#
         )
@@ -232,11 +232,11 @@ mod tests {
 
         let sample = sample!(
             json = r#"{
-            "rate": 12345,
-            "channels": 42,
-            "fmt": "use the fourcc oggi-wav",
-            "srcuuid": "12345678-9012-3456-7890-123456789012"
-        }"#
+                "rate": 12345,
+                "channels": 42,
+                "src_fmt_display": "use the fourcc oggi-wav",
+                "source_uuid": "12345678-9012-3456-7890-123456789012"
+            }"#
         );
 
         assert_eq!(sample.metadata().rate, 12345);
