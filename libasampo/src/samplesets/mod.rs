@@ -133,6 +133,7 @@ pub trait SampleSetOps {
     fn labelling(&self) -> Option<&SampleSetLabelling>;
     fn labelling_mut(&mut self) -> Option<&mut SampleSetLabelling>;
     fn add(&mut self, source: &Source, sample: &Sample) -> Result<(), Error>;
+    fn add_with_hash(&mut self, sample: &Sample, hash: &str);
     fn remove(&mut self, sample: &Sample) -> Result<(), Error>;
     fn contains(&self, sample: &Sample) -> bool;
     fn is_empty(&self) -> bool;
@@ -161,6 +162,10 @@ impl BaseSampleSet {
 
     pub fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>) {
         self.labelling = labelling;
+    }
+
+    pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
+        self.uuid = uuid;
     }
 }
 
@@ -196,6 +201,11 @@ impl SampleSetOps for BaseSampleSet {
         );
 
         Ok(())
+    }
+
+    fn add_with_hash(&mut self, sample: &Sample, hash: &str) {
+        self.samples.insert(sample.clone());
+        self.audio_hash.insert(sample.uri().clone(), hash.to_string());
     }
 
     fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
@@ -270,6 +280,12 @@ impl SampleSetOps for SampleSet {
     fn add(&mut self, source: &Source, sample: &Sample) -> Result<(), Error> {
         match self {
             Self::BaseSampleSet(set) => set.add(source, sample),
+        }
+    }
+
+    fn add_with_hash(&mut self, sample: &Sample, hash: &str) {
+        match self {
+            Self::BaseSampleSet(set) => set.add_with_hash(sample, hash),
         }
     }
 
