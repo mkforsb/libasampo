@@ -33,6 +33,14 @@ pub enum DrumkitLabel {
     Tom3,
 }
 
+pub trait SampleSetLabellingOps {
+    fn contains(&self, uri: &SampleURI) -> bool;
+    fn remove(&mut self, uri: &SampleURI) -> Result<(), Error>;
+    fn clear(&mut self);
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct DrumkitLabelling {
     labels: HashMap<SampleURI, DrumkitLabel>,
@@ -45,23 +53,37 @@ impl DrumkitLabelling {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.labels.clear();
+    pub fn get(&self, uri: &SampleURI) -> Option<&DrumkitLabel> {
+        self.labels.get(uri)
     }
 
-    pub fn get(&self, sample: &Sample) -> Option<&DrumkitLabel> {
-        self.labels.get(sample.uri())
+    pub fn set(&mut self, uri: &SampleURI, label: DrumkitLabel) {
+        self.labels.insert(uri.clone(), label);
+    }
+}
+
+impl SampleSetLabellingOps for DrumkitLabelling {
+    fn contains(&self, uri: &SampleURI) -> bool {
+        self.labels.contains_key(uri)
     }
 
-    pub fn set(&mut self, sample: &Sample, label: DrumkitLabel) {
-        self.labels.insert(sample.uri().clone(), label);
+    fn clear(&mut self) {
+        self.labels.clear()
     }
 
-    pub fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
+    fn len(&self) -> usize {
+        self.labels.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.labels.is_empty()
+    }
+
+    fn remove(&mut self, uri: &SampleURI) -> Result<(), Error> {
         self.labels
-            .remove(sample.uri())
+            .remove(uri)
             .ok_or(Error::SampleSetSampleNotPresentError {
-                uri: sample.uri().to_string(),
+                uri: uri.to_string(),
             })
             .map(|_| ())
     }
@@ -72,15 +94,34 @@ pub enum SampleSetLabelling {
     DrumkitLabelling(DrumkitLabelling),
 }
 
-impl SampleSetLabelling {
-    pub fn has_label_for(&self, sample: &Sample) -> bool {
+impl SampleSetLabellingOps for SampleSetLabelling {
+    fn contains(&self, uri: &SampleURI) -> bool {
         match self {
-            Self::DrumkitLabelling(labels) => labels.get(sample).is_some(),
+            Self::DrumkitLabelling(kit) => kit.contains(uri),
         }
     }
-    pub fn remove_label_for(&mut self, sample: &Sample) -> Result<(), Error> {
+
+    fn remove(&mut self, uri: &SampleURI) -> Result<(), Error> {
         match self {
-            Self::DrumkitLabelling(labels) => labels.remove(sample),
+            Self::DrumkitLabelling(kit) => kit.remove(uri),
+        }
+    }
+
+    fn clear(&mut self) {
+        match self {
+            Self::DrumkitLabelling(kit) => kit.clear(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::DrumkitLabelling(kit) => kit.len(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::DrumkitLabelling(kit) => kit.is_empty(),
         }
     }
 }
@@ -161,7 +202,7 @@ impl SampleSetOps for BaseSampleSet {
         if !self.samples.remove(sample) {
             assert!(!self.audio_hash.contains_key(sample.uri()));
             assert!(
-                self.labelling.is_none() || !self.labelling.as_mut().unwrap().has_label_for(sample)
+                self.labelling.is_none() || !self.labelling.as_mut().unwrap().contains(sample.uri())
             );
 
             Err(Error::SampleSetSampleNotPresentError {
@@ -172,7 +213,7 @@ impl SampleSetOps for BaseSampleSet {
                 .remove(sample.uri())
                 .expect("Should exist a matching key in audio_hash");
 
-            self.labelling.as_mut().map(|x| x.remove_label_for(sample));
+            self.labelling.as_mut().map(|x| x.remove(sample.uri()));
             Ok(())
         }
     }
@@ -352,21 +393,21 @@ mod tests {
         assert!(!set
             .labelling()
             .unwrap()
-            .has_label_for(&source.list().unwrap()[0]));
+            .contains(source.list().unwrap()[0].uri()));
 
         if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
-            labels.set(&source.list().unwrap()[0], DrumkitLabel::Clap);
+            labels.set(source.list().unwrap()[0].uri(), DrumkitLabel::Clap);
         }
 
         assert!(set
             .labelling()
             .unwrap()
-            .has_label_for(&source.list().unwrap()[0]));
+            .contains(source.list().unwrap()[0].uri()));
 
         assert_eq!(
             match set.labelling() {
                 Some(SampleSetLabelling::DrumkitLabelling(labels)) =>
-                    labels.get(&source.list().unwrap()[0]),
+                    labels.get(source.list().unwrap()[0].uri()),
                 None => None,
             },
             Some(DrumkitLabel::Clap).as_ref()
@@ -402,7 +443,7 @@ mod tests {
         }
 
         if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
-            labels.set(&source.list().unwrap()[0], DrumkitLabel::Clap);
+            labels.set(source.list().unwrap()[0].uri(), DrumkitLabel::Clap);
         }
 
         set.remove(&source.list().unwrap()[0]).unwrap();
@@ -414,6 +455,6 @@ mod tests {
         assert!(!set
             .labelling()
             .unwrap()
-            .has_label_for(&source.list().unwrap()[0]));
+            .contains(source.list().unwrap()[0].uri()));
     }
 }
