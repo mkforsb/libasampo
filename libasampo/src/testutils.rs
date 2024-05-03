@@ -149,7 +149,7 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
             .iter()
             .map(|(key, val)| match val {
                 json::JsonValue::Array(vals) => (
-                    key.to_string(),
+                    SampleURI(key.to_string()),
                     vals.iter()
                         .map(|val| match val {
                             json::JsonValue::Number(num) => {
@@ -171,7 +171,7 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
         json::JsonValue::Null if list.is_empty() => HashMap::new(),
         json::JsonValue::Null => list
             .iter()
-            .map(|sample| (sample.uri().to_string(), vec![]))
+            .map(|sample| (sample.uri().clone(), vec![]))
             .collect(),
         _ => panic!(),
     };

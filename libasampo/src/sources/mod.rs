@@ -14,7 +14,7 @@ use crate::errors::Error;
 use crate::samples::Sample;
 
 #[cfg(any(test, feature = "fakes"))]
-use crate::samples::SampleOps;
+use crate::samples::{SampleOps, SampleURI};
 
 pub mod file_system_source;
 
@@ -134,7 +134,7 @@ pub struct FakeSource {
     pub uuid: Uuid,
     pub list: Vec<Sample>,
     pub list_error: Option<fn() -> Error>,
-    pub stream: HashMap<String, Vec<f32>>,
+    pub stream: HashMap<SampleURI, Vec<f32>>,
     pub stream_error: Option<fn() -> Error>,
     pub enabled: bool,
 }
@@ -211,7 +211,7 @@ impl SourceOps for Source {
             #[cfg(any(test, feature = "fakes"))]
             Self::FakeSource(src) => match &src.stream_error {
                 Some(error) => Err(error()),
-                None => match src.stream.get(sample.uri().as_str()) {
+                None => match src.stream.get(sample.uri()) {
                     Some(vec) => Ok(SourceReader::VecReader(vec.clone(), 0)),
                     None => Err(Error::IoError {
                         uri: sample.uri().to_string(),
