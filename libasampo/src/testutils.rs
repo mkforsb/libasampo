@@ -317,7 +317,6 @@ mod tests {
                     .unwrap();
 
                 (0..3)
-                    .into_iter()
                     .map(|_| stream.read_f32::<NativeEndian>().unwrap())
                     .collect::<Vec<_>>()
             },
@@ -331,7 +330,6 @@ mod tests {
                     .unwrap();
 
                 (0..4)
-                    .into_iter()
                     .map(|_| stream.read_f32::<NativeEndian>().unwrap())
                     .collect::<Vec<_>>()
             },

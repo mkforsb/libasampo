@@ -201,6 +201,6 @@ mod tests {
         let encoded = serde_json::to_string(&serializable).unwrap();
         let decoded = serde_json::from_str::<SampleSet>(&encoded).unwrap();
 
-        let domained = decoded.try_into_domain().unwrap();
+        let _domained = decoded.try_into_domain().unwrap();
     }
 }

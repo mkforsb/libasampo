@@ -28,21 +28,21 @@ pub trait Serialize {
 
 impl Serialize for crate::samples::Sample {
     fn serialize(&self) -> Result<serde_json::Value, Error> {
-        serde_json::to_value(&Sample::try_from_domain(self)?)
+        serde_json::to_value(Sample::try_from_domain(self)?)
             .map_err(|e| Error::SerializationError(format!("Failed to serialize {self:?}: {e:?}")))
     }
 }
 
 impl Serialize for crate::samplesets::SampleSet {
     fn serialize(&self) -> Result<serde_json::Value, Error> {
-        serde_json::to_value(&SampleSet::try_from_domain(self)?)
+        serde_json::to_value(SampleSet::try_from_domain(self)?)
             .map_err(|e| Error::SerializationError(format!("Failed to serialize {self:?}: {e:?}")))
     }
 }
 
 impl Serialize for crate::sources::Source {
     fn serialize(&self) -> Result<serde_json::Value, Error> {
-        serde_json::to_value(&Source::try_from_domain(self)?)
+        serde_json::to_value(Source::try_from_domain(self)?)
             .map_err(|e| Error::SerializationError(format!("Failed to serialize {self:?}: {e:?}")))
     }
 }
