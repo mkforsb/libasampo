@@ -33,15 +33,9 @@ pub enum DrumkitLabel {
     Tom3,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct DrumkitLabelling {
     labels: HashMap<SampleURI, DrumkitLabel>,
-}
-
-impl Default for DrumkitLabelling {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl DrumkitLabelling {
