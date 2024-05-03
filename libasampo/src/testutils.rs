@@ -132,7 +132,20 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
         json::JsonValue::Array(arr)
             if arr.iter().all(|x| matches!(x, json::JsonValue::Object(_))) =>
         {
-            arr.iter().map(sample_from_json).collect()
+            arr.iter()
+                .map(|obj| {
+                    if !obj.has_key("source_uuid") {
+                        let mut obj_with_uuid = obj.clone();
+                        obj_with_uuid
+                            .insert("source_uuid", uuid.to_string())
+                            .unwrap();
+
+                        sample_from_json(&obj_with_uuid)
+                    } else {
+                        sample_from_json(obj)
+                    }
+                })
+                .collect()
         }
         json::JsonValue::Null => vec![],
         _ => panic!("fakesource_from_json:: invalid value for `list` (valid: [Sample*])"),
@@ -286,6 +299,12 @@ mod tests {
         assert_eq!(source.list().unwrap().len(), 2);
         assert_eq!(source.list().unwrap().first().unwrap().uri(), "1.wav");
         assert_eq!(source.list().unwrap().get(1).unwrap().uri(), "2.wav");
+
+        assert!(source
+            .list()
+            .unwrap()
+            .iter()
+            .all(|s| s.source_uuid().unwrap() == source.uuid()));
 
         assert!(source
             .stream(source.list().unwrap().first().unwrap())
