@@ -85,6 +85,8 @@ impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
                     None => (),
                 }
             }
+
+            result.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(labelling)));
         }
 
         Ok(result)
@@ -103,17 +105,19 @@ impl TryFromDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
 
         let (labelling_kind, labels) = match value.labelling() {
             Some(SampleSetLabelling::DrumkitLabelling(labels)) => ("drumkit".to_string(), {
-                samples
-                    .iter()
-                    .map(|sample| {
-                        labels.get(sample.uri()).map(|label| {
-                            DRUMKIT_LABELS
-                                .iter()
-                                .find(|(_s, val)| val == label)
-                                .map(|(s, _val)| s.to_string())
+                Some(
+                    samples
+                        .iter()
+                        .map(|sample| {
+                            labels.get(sample.uri()).and_then(|label| {
+                                DRUMKIT_LABELS
+                                    .iter()
+                                    .find(|(_s, val)| val == label)
+                                    .map(|(s, _val)| s.to_string())
+                            })
                         })
-                    })
-                    .collect()
+                        .collect(),
+                )
             }),
             None => ("none".to_string(), None),
         };
@@ -172,7 +176,11 @@ impl TryFromDomain<crate::samplesets::SampleSet> for SampleSet {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::SourceOps, testutils::audiohash_for_test};
+    use crate::{
+        prelude::{SampleSetLabellingOps, SourceOps},
+        samplesets::{DrumkitLabel, DrumkitLabelling},
+        testutils::audiohash_for_test,
+    };
 
     use super::*;
     #[test]
@@ -190,17 +198,71 @@ mod tests {
             }"#
         );
 
-        let mut set = crate::samplesets::BaseSampleSet::new("Roliga Ljud");
+        let samples = src.list().unwrap();
+        let s1 = samples.first().unwrap();
+        let s2 = samples.get(1).unwrap();
+
+        let mut set = crate::samplesets::BaseSampleSet::new("Favorites");
 
         set.add(&src, src.list().unwrap().first().unwrap()).unwrap();
         set.add(&src, src.list().unwrap().get(1).unwrap()).unwrap();
 
+        set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(
+            DrumkitLabelling::new(),
+        )));
+
+        match set.labelling_mut() {
+            Some(SampleSetLabelling::DrumkitLabelling(labels)) => {
+                labels.set(s1.uri(), DrumkitLabel::CrashCymbal);
+            }
+            None => panic!(),
+        }
+
         let serializable =
             SampleSet::try_from_domain(&crate::samplesets::SampleSet::BaseSampleSet(set)).unwrap();
 
-        let encoded = serde_json::to_string(&serializable).unwrap();
+        let encoded = serde_json::to_string_pretty(&serializable).unwrap();
         let decoded = serde_json::from_str::<SampleSet>(&encoded).unwrap();
 
-        let _domained = decoded.try_into_domain().unwrap();
+        match &decoded {
+            SampleSet::BaseSampleSetV1(set) => {
+                assert_eq!(set.name, "Favorites");
+                assert_eq!(set.samples.len(), 2);
+                assert_eq!(set.labels.as_ref().unwrap().len(), 2);
+                assert_eq!(
+                    set.audio_hash.first(),
+                    Some("hashresponse".to_string()).as_ref()
+                );
+                assert_eq!(
+                    set.audio_hash.get(1),
+                    Some("hashresponse".to_string()).as_ref()
+                );
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => panic!(),
+        }
+
+        let domained = decoded.try_into_domain().unwrap();
+
+        match &domained {
+            crate::samplesets::SampleSet::BaseSampleSet(set) => {
+                assert_eq!(set.name(), "Favorites");
+                assert_eq!(set.len(), 2);
+                assert!(set.contains(s1));
+                assert!(set.contains(s2));
+                assert_eq!(set.list().len(), 2);
+                assert!(set.list().contains(&s1));
+                assert!(set.list().contains(&s2));
+                assert_eq!(set.labelling().unwrap().len(), 1);
+                assert!(set.labelling().unwrap().contains(s1.uri()));
+                assert!(!set.labelling().unwrap().contains(s2.uri()));
+                assert_eq!(set.cached_audio_hash_of(s1), Some("hashresponse"));
+                assert_eq!(set.cached_audio_hash_of(s2), Some("hashresponse"));
+            }
+
+            #[allow(unreachable_patterns)]
+            _ => panic!(),
+        }
     }
 }
