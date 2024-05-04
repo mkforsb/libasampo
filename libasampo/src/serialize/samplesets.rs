@@ -58,7 +58,7 @@ impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
 
         if self.labelling_kind.as_str() == "drumkit" {
             let labels = self.labels.expect(
-                "Serialized sample set with labelling_kind != none should contain\
+                "Serialized sample set with labelling_kind != none should contain \
                     list of labels",
             );
 
