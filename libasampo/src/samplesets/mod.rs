@@ -136,6 +136,7 @@ pub trait SampleSetOps {
     fn add_with_hash(&mut self, sample: &Sample, hash: &str);
     fn remove(&mut self, sample: &Sample) -> Result<(), Error>;
     fn contains(&self, sample: &Sample) -> bool;
+    fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
     fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str>;
 }
@@ -195,24 +196,24 @@ impl SampleSetOps for BaseSampleSet {
 
     fn add(&mut self, source: &Source, sample: &Sample) -> Result<(), Error> {
         self.samples.insert(sample.clone());
-        self.audio_hash.insert(
-            sample.uri().clone(),
-            audio_hash(source.stream(sample)?)?,
-        );
+        self.audio_hash
+            .insert(sample.uri().clone(), audio_hash(source.stream(sample)?)?);
 
         Ok(())
     }
 
     fn add_with_hash(&mut self, sample: &Sample, hash: &str) {
         self.samples.insert(sample.clone());
-        self.audio_hash.insert(sample.uri().clone(), hash.to_string());
+        self.audio_hash
+            .insert(sample.uri().clone(), hash.to_string());
     }
 
     fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
         if !self.samples.remove(sample) {
             assert!(!self.audio_hash.contains_key(sample.uri()));
             assert!(
-                self.labelling.is_none() || !self.labelling.as_mut().unwrap().contains(sample.uri())
+                self.labelling.is_none()
+                    || !self.labelling.as_mut().unwrap().contains(sample.uri())
             );
 
             Err(Error::SampleSetSampleNotPresentError {
@@ -230,6 +231,10 @@ impl SampleSetOps for BaseSampleSet {
 
     fn contains(&self, sample: &Sample) -> bool {
         self.samples.contains(sample)
+    }
+
+    fn len(&self) -> usize {
+        self.samples.len()
     }
 
     fn is_empty(&self) -> bool {
@@ -298,6 +303,12 @@ impl SampleSetOps for SampleSet {
     fn contains(&self, sample: &Sample) -> bool {
         match self {
             Self::BaseSampleSet(set) => set.contains(sample),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::BaseSampleSet(set) => set.len(),
         }
     }
 
