@@ -41,7 +41,7 @@ pub trait SampleSetLabellingOps {
     fn is_empty(&self) -> bool;
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DrumkitLabelling {
     labels: HashMap<SampleURI, DrumkitLabel>,
 }
@@ -89,7 +89,7 @@ impl SampleSetLabellingOps for DrumkitLabelling {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SampleSetLabelling {
     DrumkitLabelling(DrumkitLabelling),
 }
@@ -141,7 +141,7 @@ pub trait SampleSetOps {
     fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BaseSampleSet {
     uuid: Uuid,
     name: String,
@@ -246,7 +246,7 @@ impl SampleSetOps for BaseSampleSet {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SampleSet {
     BaseSampleSet(BaseSampleSet),
 }
