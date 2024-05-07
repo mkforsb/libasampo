@@ -5,7 +5,7 @@
 use libasampo::{
     samples::{BaseSample, Sample, SampleMetadata, SampleURI},
     serialize::{self, TryFromDomain, TryIntoDomain},
-    sources::{file_system_source::FilesystemSource, Source},
+    sources::{file_system_source::FilesystemSource, Source, SourceOps},
 };
 use uuid::Uuid;
 
@@ -20,6 +20,8 @@ fn test_ser_de_sample() {
             rate: 44100,
             channels: 2,
             src_fmt_display: "PCM".to_string(),
+            size_bytes: Some(1000),
+            length_millis: Some(2000),
         },
         Some(source_uuid),
     ));

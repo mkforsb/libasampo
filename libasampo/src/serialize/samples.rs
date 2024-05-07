@@ -19,6 +19,8 @@ pub struct BaseSampleV1 {
     channels: u8,
     format: String,
     source_uuid: Option<Uuid>,
+    size_bytes: Option<u64>,
+    length_millis: Option<u64>,
 }
 
 impl TryIntoDomain<crate::samples::BaseSample> for BaseSampleV1 {
@@ -30,6 +32,8 @@ impl TryIntoDomain<crate::samples::BaseSample> for BaseSampleV1 {
                 rate: self.rate,
                 channels: self.channels,
                 src_fmt_display: self.format,
+                size_bytes: self.size_bytes,
+                length_millis: self.length_millis,
             },
             self.source_uuid,
         ))
@@ -45,6 +49,8 @@ impl TryFromDomain<crate::samples::BaseSample> for BaseSampleV1 {
             channels: value.metadata().channels,
             format: value.metadata().src_fmt_display.clone(),
             source_uuid: value.source_uuid().copied(),
+            size_bytes: value.metadata().size_bytes,
+            length_millis: value.metadata().length_millis,
         })
     }
 }
@@ -95,6 +101,8 @@ mod tests {
             channels,
             format: format.clone(),
             source_uuid: Some(source_uuid),
+            size_bytes: Some(3141592),
+            length_millis: Some(271828),
         });
 
         let encoded = serde_json::to_string(&x).unwrap();
@@ -108,6 +116,8 @@ mod tests {
                 assert_eq!(s.channels, channels);
                 assert_eq!(s.format, format);
                 assert_eq!(s.source_uuid, Some(source_uuid));
+                assert_eq!(s.size_bytes, Some(3141592));
+                assert_eq!(s.length_millis, Some(271828));
             }
 
             #[allow(unreachable_patterns)]

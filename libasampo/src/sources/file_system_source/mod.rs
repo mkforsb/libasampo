@@ -213,6 +213,8 @@ mod tests {
                     rate: 44100,
                     channels: 2,
                     src_fmt_display: String::from("PCM S16LE"),
+                    size_bytes: None,
+                    length_millis: None,
                 })
             });
             mockio

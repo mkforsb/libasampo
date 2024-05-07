@@ -11,6 +11,10 @@ pub struct SampleMetadata {
     pub rate: u32,
     pub channels: u8,
     pub src_fmt_display: String,
+
+    // TODO: slow and/or wasteful to include these? better to fetch on request?
+    pub size_bytes: Option<u64>,
+    pub length_millis: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
