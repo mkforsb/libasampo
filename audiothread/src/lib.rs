@@ -1034,13 +1034,10 @@ mod tests {
         let mut src = Source::SymphoniaSource(StreamState::Streaming, sf);
         src.set_state(StreamState::Complete);
 
-        assert!(
-            if let Source::SymphoniaSource(StreamState::Complete, _) = src {
-                true
-            } else {
-                false
-            }
-        );
+        assert!(matches!(
+            src,
+            Source::SymphoniaSource(StreamState::Complete, _)
+        ));
     }
 
     #[test]
@@ -1083,13 +1080,10 @@ mod tests {
         mix(&mut src, &mut buffer); // exhausts the iterator, causing sf.eof -> true
         mix(&mut src, &mut buffer); // detects .eof, updates stream state
 
-        assert!(
-            if let Source::SymphoniaSource(StreamState::Complete, _) = src {
-                true
-            } else {
-                false
-            }
-        );
+        assert!(matches!(
+            src,
+            Source::SymphoniaSource(StreamState::Complete, _)
+        ));
     }
 
     #[test]

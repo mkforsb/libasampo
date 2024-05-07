@@ -8,6 +8,7 @@ pub(crate) mod audiohash_for_test {
     use crate::{errors::Error, sources::SourceReader};
 
     thread_local! {
+        #[allow(clippy::type_complexity)]
         pub(crate) static RESULT: Cell<Option<fn(SourceReader) -> Result<String, Error>>>
             = Cell::new(None);
     }
