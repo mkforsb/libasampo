@@ -64,13 +64,13 @@ pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample
     };
 
     let size_bytes = match &json["size_bytes"] {
-        json::JsonValue::Number(n) => Some(n.as_fixed_point_u64(0).unwrap() as u64),
+        json::JsonValue::Number(n) => Some(n.as_fixed_point_u64(0).unwrap()),
         json::JsonValue::Null => None,
         _ => panic!("sample_from_json: invalid value for `size_bytes` (valid: Number)"),
     };
 
     let length_millis = match &json["length_millis"] {
-        json::JsonValue::Number(n) => Some(n.as_fixed_point_u64(0).unwrap() as u64),
+        json::JsonValue::Number(n) => Some(n.as_fixed_point_u64(0).unwrap()),
         json::JsonValue::Null => None,
         _ => panic!("sample_from_json: invalid value for `length_millis` (valid: Number)"),
     };

@@ -5,7 +5,7 @@
 use libasampo::{
     samples::{BaseSample, Sample, SampleMetadata, SampleURI},
     serialize::{self, TryFromDomain, TryIntoDomain},
-    sources::{file_system_source::FilesystemSource, Source, SourceOps},
+    sources::{file_system_source::FilesystemSource, Source},
 };
 use uuid::Uuid;
 

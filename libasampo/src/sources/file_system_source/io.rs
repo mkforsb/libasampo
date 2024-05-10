@@ -113,16 +113,14 @@ impl IO for DefaultIO {
                     src_fmt_display: "readable format info".to_string(),
 
                     size_bytes: {
-                        File::open(path).map_or(None, |mut fd| {
-                            fd.seek(SeekFrom::End(0)).map_or(None, |offset| Some(offset))
-                        })
+                        File::open(path).map_or(None, |mut fd| fd.seek(SeekFrom::End(0)).ok())
                     },
 
                     length_millis: match (codec_params.time_base, codec_params.n_frames) {
                         (Some(timebase), Some(n)) => {
                             let time = timebase.calc_time(n);
                             Some(time.seconds * 1000 + ((time.frac * 1000.0) as u64))
-                        },
+                        }
                         _ => None,
                     },
                 })
