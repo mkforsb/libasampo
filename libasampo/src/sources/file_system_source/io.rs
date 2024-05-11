@@ -30,6 +30,7 @@ pub trait IO: Clone {
     fn glob(&self, pattern: &str) -> Result<Self::Paths, Error>;
     fn is_file(&self, path: &Path) -> bool;
     fn stream(&self, path: &Path) -> Result<SourceReader, Error>;
+    fn raw_copy<T: 'static + std::io::Write>(&self, src: &Path, dst: &mut T) -> Result<(), Error>;
     fn metadata(&self, path: &Path) -> Result<SampleMetadata, Error>;
 }
 
@@ -46,6 +47,7 @@ mockall::mock! {
         fn glob(&self, pattern: &str) -> Result<<Self as IO>::Paths, Error>;
         fn is_file(&self, path: &Path) -> bool;
         fn stream(&self, path: &Path) -> Result<SourceReader, Error>;
+        fn raw_copy<T: 'static + std::io::Write>(&self, src: &Path, dst: &mut T) -> Result<(), Error>;
         fn metadata(&self, path: &Path) -> Result<SampleMetadata, Error>;
     }
 
@@ -74,6 +76,21 @@ impl IO for DefaultIO {
 
     fn stream(&self, path: &Path) -> Result<SourceReader, Error> {
         Ok(File::open(path)?.into())
+    }
+
+    fn raw_copy<T: 'static + std::io::Write>(&self, src: &Path, dst: &mut T) -> Result<(), Error> {
+        Ok(std::io::copy(
+            &mut File::open(src).map_err(|e| Error::IoError {
+                uri: src.to_string_lossy().to_string(),
+                details: e.to_string(),
+            })?,
+            dst,
+        )
+        .map(|_| ())
+        .map_err(|e| Error::IoError {
+            uri: src.to_string_lossy().to_string(),
+            details: e.to_string(),
+        })?)
     }
 
     fn metadata(&self, path: &Path) -> Result<SampleMetadata, Error> {

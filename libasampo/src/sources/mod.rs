@@ -89,6 +89,13 @@ pub trait SourceOps: PartialEq + Clone + std::fmt::Debug {
     fn uuid(&self) -> &Uuid;
     fn list(&self) -> Result<Vec<Sample>, Error>;
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error>;
+
+    fn raw_copy<T: 'static + std::io::Write>(
+        &self,
+        sample: &Sample,
+        recpt: &mut T,
+    ) -> Result<(), Error>;
+
     fn is_enabled(&self) -> bool;
     fn set_enabled(&mut self, enabled: bool);
     fn enable(&mut self);
@@ -105,6 +112,13 @@ mockall::mock! {
         fn uuid(&self) -> &Uuid;
         fn list(&self) -> Result<Vec<Sample>, Error>;
         fn stream(&self, sample: &Sample) -> Result<SourceReader, Error>;
+
+        fn raw_copy<T: 'static + std::io::Write>(
+            &self,
+            sample: &Sample,
+            recpt: &mut T,
+        ) -> Result<(), Error>;
+
         fn is_enabled(&self) -> bool;
         fn set_enabled(&mut self, enabled: bool);
         fn enable(&mut self);
@@ -217,6 +231,24 @@ impl SourceOps for Source {
                     }),
                 },
             },
+        }
+    }
+
+    fn raw_copy<T: 'static + std::io::Write>(
+        &self,
+        sample: &Sample,
+        recpt: &mut T,
+    ) -> Result<(), Error> {
+        match self {
+            Source::FilesystemSource(src) => src.raw_copy(sample, recpt),
+
+            #[cfg(feature = "mocks")]
+            Source::MockSource(_) => todo!(),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Source::FakeSource(_) => {
+                Ok(std::io::copy(&mut self.stream(sample)?, recpt).map(|_| ())?)
+            }
         }
     }
 

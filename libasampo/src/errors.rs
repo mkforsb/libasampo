@@ -5,6 +5,7 @@
 use std::{error::Error as StdError, io};
 
 use thiserror::Error as ThisError;
+use uuid::Uuid;
 
 #[derive(ThisError, Debug)]
 pub enum Error {
@@ -28,6 +29,12 @@ pub enum Error {
 
     #[error("Deserialization error: {0}")]
     DeserializationError(String),
+
+    #[error("Sample {0} missing source UUID")]
+    SampleMissingSourceUUIDError(String),
+
+    #[error("Missing source: {0}")]
+    MissingSourceError(Uuid),
 }
 
 impl Error {

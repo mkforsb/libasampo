@@ -135,6 +135,14 @@ where
         }
     }
 
+    fn raw_copy<W: 'static + std::io::Write>(
+        &self,
+        sample: &Sample,
+        recpt: &mut W,
+    ) -> Result<(), Error> {
+        self.io.raw_copy(Path::new(&String::from_iter(sample.uri().chars().skip(7))), recpt)
+    }
+
     fn is_enabled(&self) -> bool {
         self.enabled
     }
