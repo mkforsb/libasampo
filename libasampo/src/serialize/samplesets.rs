@@ -73,7 +73,7 @@ impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
             for (i, sample) in samples.iter().enumerate() {
                 match labels.get(i).unwrap() {
                     Some(label) => labelling.set(
-                        sample.uri(),
+                        sample.uri().clone(),
                         DRUMKIT_LABELS
                             .iter()
                             .find(|(s, _val)| s == label)
@@ -213,7 +213,7 @@ mod tests {
 
         match set.labelling_mut() {
             Some(SampleSetLabelling::DrumkitLabelling(labels)) => {
-                labels.set(s1.uri(), DrumkitLabel::CrashCymbal);
+                labels.set(s1.uri().clone(), DrumkitLabel::CrashCymbal);
             }
             None => panic!(),
         }
