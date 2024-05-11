@@ -132,6 +132,7 @@ pub trait SampleSetOps {
     fn uuid(&self) -> &Uuid;
     fn name(&self) -> &str;
     fn list(&self) -> Vec<&Sample>;
+    fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>);
     fn labelling(&self) -> Option<&SampleSetLabelling>;
     fn labelling_mut(&mut self) -> Option<&mut SampleSetLabelling>;
     fn add(&mut self, source: &Source, sample: &Sample) -> Result<(), Error>;
@@ -163,10 +164,6 @@ impl BaseSampleSet {
         }
     }
 
-    pub fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>) {
-        self.labelling = labelling;
-    }
-
     pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
         self.uuid = uuid;
     }
@@ -186,6 +183,10 @@ impl SampleSetOps for BaseSampleSet {
         result.sort_by(|a: &&Sample, b: &&Sample| a.uri().cmp(b.uri()));
 
         result
+    }
+
+    fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>) {
+        self.labelling = labelling;
     }
 
     fn labelling(&self) -> Option<&SampleSetLabelling> {
@@ -269,6 +270,12 @@ impl SampleSetOps for SampleSet {
     fn list(&self) -> Vec<&Sample> {
         match self {
             Self::BaseSampleSet(set) => set.list(),
+        }
+    }
+
+    fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>) {
+        match self {
+            SampleSet::BaseSampleSet(set) => set.set_labelling(labelling),
         }
     }
 
