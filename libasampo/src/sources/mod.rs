@@ -37,20 +37,18 @@ impl Read for SourceReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self {
             SourceReader::FileReader(fd) => fd.read(buf),
-            SourceReader::VecReader(v, pos) => {
-                if *pos < v.len() {
-                    unsafe {
-                        let (_, buf_f32, _) = buf.align_to_mut::<f32>();
-                        let floats_to_write = core::cmp::min(buf_f32.len(), v.len() - *pos);
-                        buf_f32[..floats_to_write]
-                            .copy_from_slice(&v[*pos..(*pos + floats_to_write)]);
-                        *pos += buf_f32.len();
-                        Ok(4 * floats_to_write)
-                    }
+            SourceReader::VecReader(v, pos) => unsafe {
+                let (_, v_u8, _) = v.as_slice().align_to::<u8>();
+
+                if *pos < v_u8.len() {
+                    let limit = core::cmp::min(buf.len(), v_u8.len() - *pos);
+                    buf[..limit].copy_from_slice(&v_u8[*pos..(*pos + limit)]);
+                    *pos += limit;
+                    Ok(limit)
                 } else {
                     Ok(0)
                 }
-            }
+            },
             Self::NullReader() => unimplemented!(),
         }
     }
