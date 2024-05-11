@@ -61,18 +61,23 @@ impl Seek for SourceReader {
 
             SourceReader::VecReader(v, pos) => match spec {
                 std::io::SeekFrom::Start(to) => {
-                    *pos = core::cmp::min(to as usize, v.len());
-                    Ok(4 * (*pos as u64))
+                    *pos = core::cmp::min(to as usize, v.len() * 4);
+                    Ok(*pos as u64)
                 }
 
                 std::io::SeekFrom::End(to) => {
-                    *pos = core::cmp::max(0, *pos - (to as usize));
-                    Ok(4 * (*pos as u64))
+                    *pos = core::cmp::min(
+                        core::cmp::max(0, ((v.len() * 4) as i64) + to) as usize,
+                        v.len() * 4,
+                    );
+
+                    Ok(*pos as u64)
                 }
 
                 std::io::SeekFrom::Current(to) => {
-                    *pos = core::cmp::min(*pos + (to as usize), v.len());
-                    Ok(4 * (*pos as u64))
+                    *pos =
+                        core::cmp::min(core::cmp::max(0, (*pos as i64) + to) as usize, v.len() * 4);
+                    Ok(*pos as u64)
                 }
             },
 
@@ -352,5 +357,28 @@ impl std::cmp::PartialEq for Source {
             #[cfg(any(test, feature = "mocks", feature = "fakes"))]
             _ => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::SeekFrom;
+
+    use super::*;
+
+    #[test]
+    fn test_vecreader_seek() {
+        let mut reader = SourceReader::VecReader(vec![1.0, 2.0, 3.0], 0);
+
+        assert_eq!(reader.seek(SeekFrom::Start(0)).unwrap(), 0);
+        assert_eq!(reader.seek(SeekFrom::Start(100)).unwrap(), 12);
+        assert_eq!(reader.seek(SeekFrom::End(0)).unwrap(), 12);
+        assert_eq!(reader.seek(SeekFrom::End(100)).unwrap(), 12);
+        assert_eq!(reader.seek(SeekFrom::End(-4)).unwrap(), 8);
+        assert_eq!(reader.seek(SeekFrom::End(-13)).unwrap(), 0);
+        assert_eq!(reader.seek(SeekFrom::Current(4)).unwrap(), 4);
+        assert_eq!(reader.seek(SeekFrom::Current(-1)).unwrap(), 3);
+        assert_eq!(reader.seek(SeekFrom::Current(-10)).unwrap(), 0);
+        assert_eq!(reader.seek(SeekFrom::Current(100)).unwrap(), 12);
     }
 }
