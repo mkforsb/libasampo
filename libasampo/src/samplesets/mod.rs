@@ -338,13 +338,9 @@ impl SampleSetOps for SampleSet {
 #[cfg(test)]
 mod tests {
     // TODO: why must `sample` be imported here, but not `fakesource`?
-    use crate::testutils::{self, fakesource_from_json, sample, sample_from_json};
+    use crate::testutils::{self, fakesource_from_json, s, sample, sample_from_json};
 
     use super::*;
-
-    fn s<T: Into<String>>(s: T) -> String {
-        s.into()
-    }
 
     #[test]
     fn test_new_empty() {

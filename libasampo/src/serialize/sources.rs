@@ -88,15 +88,15 @@ impl TryFromDomain<crate::sources::Source> for Source {
 mod tests {
     use super::*;
 
-    use crate::sources::SourceOps;
+    use crate::{sources::SourceOps, testutils::s};
 
     #[test]
     fn test_fs_source() {
-        let name = Some(String::from("Name"));
+        let name = Some(s("Name"));
         let uuid = Uuid::new_v4();
-        let path = String::from("/home");
-        let uri = String::from("file:///home");
-        let exts = vec![String::from("wav"), String::from("ogg")];
+        let path = s("/home");
+        let uri = s("file:///home");
+        let exts = vec![s("wav"), s("ogg")];
         let enabled = true;
 
         let x = Source::FilesystemSourceV1(FilesystemSourceV1 {

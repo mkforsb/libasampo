@@ -182,14 +182,10 @@ mod tests {
     use crate::{
         prelude::{SampleSetLabellingOps, SourceOps},
         samplesets::{DrumkitLabel, DrumkitLabelling},
-        testutils::audiohash_for_test,
+        testutils::{audiohash_for_test, s},
     };
 
     use super::*;
-
-    fn s<T: Into<String>>(s: T) -> String {
-        s.into()
-    }
 
     #[test]
     fn test_basesampleset() {

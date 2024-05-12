@@ -114,14 +114,10 @@ mod tests {
 
     use crate::{
         samplesets::BaseSampleSet,
-        testutils::{self, fakesource_from_json},
+        testutils::{self, fakesource_from_json, s},
     };
 
     use super::*;
-
-    fn s<T: Into<String>>(s: T) -> String {
-        s.into()
-    }
 
     #[derive(Debug, Clone)]
     struct MockIOWritable(Rc<RefCell<Vec<u8>>>);

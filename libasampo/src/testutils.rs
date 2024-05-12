@@ -2,6 +2,10 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
+pub(crate) fn s<T: Into<String>>(s: T) -> String {
+    s.into()
+}
+
 pub(crate) mod audiohash_for_test {
     use std::cell::Cell;
 
