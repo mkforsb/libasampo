@@ -79,7 +79,7 @@ impl IO for DefaultIO {
     }
 
     fn raw_copy<T: 'static + std::io::Write>(&self, src: &Path, dst: &mut T) -> Result<(), Error> {
-        Ok(std::io::copy(
+        std::io::copy(
             &mut File::open(src).map_err(|e| Error::IoError {
                 uri: src.to_string_lossy().to_string(),
                 details: e.to_string(),
@@ -90,7 +90,7 @@ impl IO for DefaultIO {
         .map_err(|e| Error::IoError {
             uri: src.to_string_lossy().to_string(),
             details: e.to_string(),
-        })?)
+        })
     }
 
     fn metadata(&self, path: &Path) -> Result<SampleMetadata, Error> {

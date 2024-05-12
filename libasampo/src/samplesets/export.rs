@@ -2,12 +2,7 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, fs::File, io::Write, path::Path};
 
 use uuid::Uuid;
 
@@ -22,7 +17,7 @@ pub trait IO {
     type Writable: 'static + Write;
 
     fn create_dir_all(&mut self, path: &Path) -> Result<(), Error>;
-    fn file_create(&mut self, path: &PathBuf) -> Result<Self::Writable, Error>;
+    fn file_create(&mut self, path: &Path) -> Result<Self::Writable, Error>;
 }
 
 struct DefaultIO;
@@ -34,7 +29,7 @@ impl IO for DefaultIO {
         Ok(std::fs::create_dir_all(path)?)
     }
 
-    fn file_create(&mut self, path: &PathBuf) -> Result<Self::Writable, Error> {
+    fn file_create(&mut self, path: &Path) -> Result<Self::Writable, Error> {
         Ok(File::create(path)?)
     }
 }
@@ -145,7 +140,7 @@ mod tests {
             Ok(())
         }
 
-        fn file_create(&mut self, path: &PathBuf) -> Result<Self::Writable, Error> {
+        fn file_create(&mut self, path: &Path) -> Result<Self::Writable, Error> {
             let writable = MockIOWritable(Rc::new(RefCell::new(Vec::new())));
 
             self.writable

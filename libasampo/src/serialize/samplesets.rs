@@ -52,7 +52,7 @@ impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
                 sample.clone(),
                 self.audio_hash
                     .get(i)
-                    .map(|s| s.clone())
+                    .cloned()
                     .ok_or(Error::DeserializationError(
                         "Serialized sample set missing audio hash for sample".to_string(),
                     ))?,
