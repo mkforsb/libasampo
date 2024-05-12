@@ -38,8 +38,7 @@ pub enum Error {
 }
 
 impl Error {
-    #[allow(non_snake_case)]
-    pub fn IoError<T, U>(uri: T, details: U) -> Error
+    pub fn io_error<T, U>(uri: T, details: U) -> Error
     where
         T: Into<String>,
         U: Into<String>,

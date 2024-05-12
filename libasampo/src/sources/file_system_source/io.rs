@@ -113,7 +113,7 @@ impl IO for DefaultIO {
                 let codec_params = &probed
                     .format
                     .default_track()
-                    .ok_or(Error::IoError(
+                    .ok_or(Error::io_error(
                         path.to_string_lossy(),
                         "Symphonia format error: No default track",
                     ))?

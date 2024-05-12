@@ -73,8 +73,8 @@ where
                 self.io.metadata(path)?,
                 Some(self.uuid),
             ))),
-            (false, Some(s)) => Err(Error::IoError(s, "Not a regular file")),
-            (_, None) => Err(Error::IoError("{n/a}", "Invalid UTF-8 in path")),
+            (false, Some(s)) => Err(Error::io_error(s, "Not a regular file")),
+            (_, None) => Err(Error::io_error("{n/a}", "Invalid UTF-8 in path")),
         }
     }
 
