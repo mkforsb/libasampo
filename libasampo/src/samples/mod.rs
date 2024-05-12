@@ -2,11 +2,9 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
-use std::ops::Deref;
-
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct SampleMetadata {
     pub rate: u32,
     pub channels: u8,
@@ -17,14 +15,22 @@ pub struct SampleMetadata {
     pub length_millis: Option<u64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SampleURI(pub String);
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SampleURI(String);
 
-impl Deref for SampleURI {
-    type Target = String;
+impl SampleURI {
+    pub fn new(uri: String) -> Self {
+        SampleURI(uri)
+    }
 
-    fn deref(&self) -> &Self::Target {
+    pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl std::fmt::Display for SampleURI {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
     }
 }
 
@@ -41,7 +47,7 @@ pub trait SampleOps {
     fn source_uuid(&self) -> Option<&Uuid>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct BaseSample {
     uri: SampleURI,
     name: String,
@@ -51,15 +57,15 @@ pub struct BaseSample {
 
 impl BaseSample {
     pub fn new(
-        uri: &SampleURI,
-        name: &str,
-        metadata: &SampleMetadata,
+        uri: SampleURI,
+        name: String,
+        metadata: SampleMetadata,
         source_uuid: Option<Uuid>,
     ) -> BaseSample {
         BaseSample {
-            uri: SampleURI(uri.to_string()),
-            name: name.to_string(),
-            metadata: metadata.clone(),
+            uri,
+            name,
+            metadata,
             source_uuid,
         }
     }
@@ -84,40 +90,39 @@ impl SampleOps for BaseSample {
 }
 
 // TODO: use enum-dispatch
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Sample {
     BaseSample(BaseSample),
+}
 
-    #[default]
-    DefaultSample,
+impl Default for Sample {
+    fn default() -> Self {
+        Sample::BaseSample(BaseSample::default())
+    }
 }
 
 impl SampleOps for Sample {
     fn uri(&self) -> &SampleURI {
         match self {
             Self::BaseSample(s) => s.uri(),
-            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn name(&self) -> &str {
         match self {
             Self::BaseSample(s) => s.name(),
-            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn metadata(&self) -> &SampleMetadata {
         match self {
             Self::BaseSample(s) => s.metadata(),
-            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 
     fn source_uuid(&self) -> Option<&Uuid> {
         match self {
             Self::BaseSample(s) => s.source_uuid(),
-            Self::DefaultSample => panic!("Cannot call methods on DefaultSample"),
         }
     }
 }

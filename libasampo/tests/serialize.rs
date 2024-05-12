@@ -14,9 +14,9 @@ fn test_ser_de_sample() {
     let source_uuid = Uuid::new_v4();
 
     let sample = Sample::BaseSample(BaseSample::new(
-        &SampleURI("file:///tmp/sound.wav".to_string()),
-        "sound.wav",
-        &SampleMetadata {
+        SampleURI::new("file:///tmp/sound.wav".to_string()),
+        "sound.wav".to_string(),
+        SampleMetadata {
             rate: 44100,
             channels: 2,
             src_fmt_display: "PCM".to_string(),

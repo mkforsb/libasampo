@@ -76,9 +76,9 @@ pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample
     };
 
     crate::samples::Sample::BaseSample(crate::samples::BaseSample::new(
-        &SampleURI(uri),
-        &name,
-        &crate::samples::SampleMetadata {
+        SampleURI::new(uri),
+        name,
+        crate::samples::SampleMetadata {
             rate,
             channels,
             src_fmt_display,
@@ -178,7 +178,7 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
             .iter()
             .map(|(key, val)| match val {
                 json::JsonValue::Array(vals) => (
-                    SampleURI(key.to_string()),
+                    SampleURI::new(key.to_string()),
                     vals.iter()
                         .map(|val| match val {
                             json::JsonValue::Number(num) => {

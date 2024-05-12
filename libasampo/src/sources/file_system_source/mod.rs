@@ -65,11 +65,12 @@ where
     pub fn sample_from_path(&self, path: &Path) -> Result<Sample, Error> {
         match (self.io.is_file(path), path.to_str()) {
             (true, Some(s)) => Ok(Sample::BaseSample(BaseSample::new(
-                &SampleURI(format!("file://{s}")),
+                SampleURI::new(format!("file://{s}")),
                 path.file_name()
                     .and_then(|name| name.to_str())
-                    .expect("file has valid UTF-8 name due to is_file and path.to_str"),
-                &self.io.metadata(path)?,
+                    .expect("file has valid UTF-8 name due to is_file and path.to_str")
+                    .to_string(),
+                self.io.metadata(path)?,
                 Some(self.uuid),
             ))),
             (false, Some(s)) => Err(Error::IoError(s, "Not a regular file")),
@@ -124,9 +125,9 @@ where
     }
 
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error> {
-        if sample.uri().starts_with("file://") {
+        if sample.uri().as_str().starts_with("file://") {
             self.io
-                .stream(Path::new(&String::from_iter(sample.uri().chars().skip(7))))
+                .stream(Path::new(&String::from_iter(sample.uri().as_str().chars().skip(7))))
         } else {
             Err(Error::SourceInvalidUriError {
                 uri: sample.uri().to_string(),
@@ -140,7 +141,10 @@ where
         sample: &Sample,
         recpt: &mut W,
     ) -> Result<(), Error> {
-        self.io.raw_copy(Path::new(&String::from_iter(sample.uri().chars().skip(7))), recpt)
+        self.io.raw_copy(
+            Path::new(&String::from_iter(sample.uri().as_str().chars().skip(7))),
+            recpt,
+        )
     }
 
     fn is_enabled(&self) -> bool {

@@ -119,6 +119,10 @@ mod tests {
 
     use super::*;
 
+    fn s<T: Into<String>>(s: T) -> String {
+        s.into()
+    }
+
     #[derive(Debug, Clone)]
     struct MockIOWritable(Rc<RefCell<Vec<u8>>>);
 
@@ -157,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_foo() {
-        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok("".to_string())));
+        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s(""))));
 
         let source = testutils::fakesource!(
             json = r#"{
@@ -171,10 +175,10 @@ mod tests {
         let s1 = samples.first().unwrap();
         let s2 = samples.get(1).unwrap();
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("Favorites"));
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("Favorites")));
 
-        set.add(&source, s1).unwrap();
-        set.add(&source, s2).unwrap();
+        set.add(&source, s1.clone()).unwrap();
+        set.add(&source, s2.clone()).unwrap();
 
         let mut job = ExportJob {
             io: MockIO {

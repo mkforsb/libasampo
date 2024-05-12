@@ -26,9 +26,9 @@ pub struct BaseSampleV1 {
 impl TryIntoDomain<crate::samples::BaseSample> for BaseSampleV1 {
     fn try_into_domain(self) -> Result<crate::samples::BaseSample, Error> {
         Ok(crate::samples::BaseSample::new(
-            &crate::samples::SampleURI(self.uri),
-            &self.name,
-            &crate::samples::SampleMetadata {
+            crate::samples::SampleURI::new(self.uri),
+            self.name,
+            crate::samples::SampleMetadata {
                 rate: self.rate,
                 channels: self.channels,
                 src_fmt_display: self.format,
@@ -74,9 +74,6 @@ impl TryFromDomain<crate::samples::Sample> for Sample {
             crate::samples::Sample::BaseSample(x) => {
                 Ok(Sample::BaseSampleV1(BaseSampleV1::try_from_domain(x)?))
             }
-            crate::samples::Sample::DefaultSample => Err(Error::DeserializationError(
-                "De/serialization not supported for DefaultSample".to_string(),
-            )),
         }
     }
 }
@@ -126,6 +123,7 @@ mod tests {
 
         let domained = decoded.clone().try_into_domain().unwrap();
 
+        #[allow(unreachable_patterns)]
         match domained {
             crate::samples::Sample::BaseSample(s) => {
                 assert_eq!(s.uri(), uri.as_str());

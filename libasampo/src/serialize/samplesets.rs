@@ -38,7 +38,7 @@ pub struct BaseSampleSetV1 {
 
 impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
     fn try_into_domain(self) -> Result<crate::samplesets::BaseSampleSet, Error> {
-        let mut result = crate::samplesets::BaseSampleSet::new(&self.name);
+        let mut result = crate::samplesets::BaseSampleSet::new(self.name);
         result.set_uuid(self.uuid);
 
         let samples = self
@@ -49,8 +49,11 @@ impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
 
         for (i, sample) in samples.iter().enumerate() {
             result.add_with_hash(
-                sample,
-                self.audio_hash.get(i).ok_or(Error::DeserializationError(
+                sample.clone(),
+                self.audio_hash
+                    .get(i)
+                    .map(|s| s.clone())
+                    .ok_or(Error::DeserializationError(
                     "Serialized sample set missing audio hash for sample".to_string(),
                 ))?,
             );
@@ -183,6 +186,11 @@ mod tests {
     };
 
     use super::*;
+
+    fn s<T: Into<String>>(s: T) -> String {
+        s.into()
+    }
+
     #[test]
     fn test_basesampleset() {
         audiohash_for_test::RESULT.set(Some(|_| Ok("hashresponse".to_string())));
@@ -202,10 +210,10 @@ mod tests {
         let s1 = samples.first().unwrap();
         let s2 = samples.get(1).unwrap();
 
-        let mut set = crate::samplesets::BaseSampleSet::new("Favorites");
+        let mut set = crate::samplesets::BaseSampleSet::new(s("Favorites"));
 
-        set.add(&src, src.list().unwrap().first().unwrap()).unwrap();
-        set.add(&src, src.list().unwrap().get(1).unwrap()).unwrap();
+        set.add(&src, s1.clone()).unwrap();
+        set.add(&src, s2.clone()).unwrap();
 
         set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(
             DrumkitLabelling::new(),
