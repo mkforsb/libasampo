@@ -54,8 +54,8 @@ impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
                     .get(i)
                     .map(|s| s.clone())
                     .ok_or(Error::DeserializationError(
-                    "Serialized sample set missing audio hash for sample".to_string(),
-                ))?,
+                        "Serialized sample set missing audio hash for sample".to_string(),
+                    ))?,
             );
         }
 

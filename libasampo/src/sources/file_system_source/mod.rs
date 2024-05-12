@@ -126,8 +126,9 @@ where
 
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error> {
         if sample.uri().as_str().starts_with("file://") {
-            self.io
-                .stream(Path::new(&String::from_iter(sample.uri().as_str().chars().skip(7))))
+            self.io.stream(Path::new(&String::from_iter(
+                sample.uri().as_str().chars().skip(7),
+            )))
         } else {
             Err(Error::SourceInvalidUriError {
                 uri: sample.uri().to_string(),
