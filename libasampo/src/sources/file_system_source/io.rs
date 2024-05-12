@@ -23,7 +23,7 @@ impl Iterator for GlobPathsWithMappedError {
     }
 }
 
-pub trait IO: Clone {
+pub trait IO: Clone + std::fmt::Debug {
     type Paths: Iterator<Item = Result<PathBuf, Error>>;
 
     // These could be static, but mockall is nicer to use with non-static methods.

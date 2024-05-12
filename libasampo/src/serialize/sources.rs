@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     errors::Error,
     serialize::{TryFromDomain, TryIntoDomain},
-    sources::file_system_source as fs_source,
+    sources::{file_system_source as fs_source, SourceOps},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,12 +39,12 @@ impl TryIntoDomain<fs_source::FilesystemSource<fs_source::io::DefaultIO>> for Fi
 impl<T: fs_source::io::IO> TryFromDomain<fs_source::FilesystemSource<T>> for FilesystemSourceV1 {
     fn try_from_domain(src: &fs_source::FilesystemSource<T>) -> Result<Self, Error> {
         Ok(FilesystemSourceV1 {
-            name: src.name.clone(),
-            uuid: src.uuid,
-            path: src.path.clone(),
-            uri: src.uri.clone(),
-            exts: src.exts.clone(),
-            enabled: src.enabled,
+            name: src.name().map(|s| s.to_string()),
+            uuid: *src.uuid(),
+            path: src.path().to_string(),
+            uri: src.uri().to_string(),
+            exts: src.exts().clone(),
+            enabled: src.is_enabled(),
         })
     }
 }

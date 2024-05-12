@@ -21,13 +21,13 @@ pub struct FilesystemSource<T>
 where
     T: IO,
 {
-    pub(crate) io: T,
-    pub(crate) name: Option<String>,
-    pub(crate) uuid: Uuid,
-    pub(crate) path: String,
-    pub(crate) uri: String,
-    pub(crate) exts: Vec<String>,
-    pub(crate) enabled: bool,
+    io: T,
+    name: Option<String>,
+    uuid: Uuid,
+    path: String,
+    uri: String,
+    exts: Vec<String>,
+    enabled: bool,
 }
 
 impl FilesystemSource<DefaultIO> {
@@ -80,6 +80,14 @@ where
 
     pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
         self.uuid = uuid;
+    }
+
+    pub(crate) fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub(crate) fn exts(&self) -> &Vec<String> {
+        &self.exts
     }
 }
 
