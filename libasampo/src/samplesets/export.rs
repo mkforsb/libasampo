@@ -20,7 +20,7 @@ pub trait IO {
     fn file_create(&mut self, path: &Path) -> Result<Self::Writable, Error>;
 }
 
-struct DefaultIO;
+pub struct DefaultIO;
 
 impl IO for DefaultIO {
     type Writable = File;
