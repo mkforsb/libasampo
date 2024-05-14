@@ -3,6 +3,9 @@ name = "libasampo"
 version = "0.0.0"
 edition = "2021"
 
+[package.metadata.cargo-machete]
+ignored = ["md-5"]
+
 [features]
 mocks = ["dep:mockall"]
 fakes = []
