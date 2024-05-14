@@ -57,10 +57,10 @@ impl From<WavSampleFormat> for hound::SampleFormat {
 
 #[derive(Debug, Clone)]
 pub struct WavSpec {
-    channels: u16,
-    sample_rate: u32,
-    bits_per_sample: u16,
-    sample_format: WavSampleFormat,
+    pub channels: u16,
+    pub sample_rate: u32,
+    pub bits_per_sample: u16,
+    pub sample_format: WavSampleFormat,
 }
 
 impl From<WavSpec> for hound::WavSpec {
