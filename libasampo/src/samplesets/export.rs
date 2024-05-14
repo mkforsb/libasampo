@@ -41,8 +41,67 @@ impl IO for DefaultIO {
 }
 
 #[derive(Debug, Clone)]
+pub enum WavSampleFormat {
+    Float,
+    Int,
+}
+
+impl From<WavSampleFormat> for hound::SampleFormat {
+    fn from(value: WavSampleFormat) -> Self {
+        match value {
+            WavSampleFormat::Float => hound::SampleFormat::Float,
+            WavSampleFormat::Int => hound::SampleFormat::Int,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WavSpec {
+    channels: u16,
+    sample_rate: u32,
+    bits_per_sample: u16,
+    sample_format: WavSampleFormat,
+}
+
+impl From<WavSpec> for hound::WavSpec {
+    fn from(value: WavSpec) -> Self {
+        let WavSpec {
+            channels,
+            sample_rate,
+            bits_per_sample,
+            sample_format,
+        } = value;
+        hound::WavSpec {
+            channels,
+            sample_rate,
+            bits_per_sample,
+            sample_format: sample_format.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum RateConversionQuality {
+    Fastest,
+    Low,
+    Medium,
+    High,
+}
+
+impl From<RateConversionQuality> for samplerate::ConverterType {
+    fn from(value: RateConversionQuality) -> Self {
+        match value {
+            RateConversionQuality::Fastest => samplerate::ConverterType::Linear,
+            RateConversionQuality::Low => samplerate::ConverterType::SincFastest,
+            RateConversionQuality::Medium => samplerate::ConverterType::SincMediumQuality,
+            RateConversionQuality::High => samplerate::ConverterType::SincBestQuality,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Conversion {
-    Wav(hound::WavSpec, Option<samplerate::ConverterType>),
+    Wav(WavSpec, Option<RateConversionQuality>),
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +182,9 @@ where
 
             match &self.conversion {
                 Some(Conversion::Wav(spec, rcq)) => {
+                    let spec: hound::WavSpec = spec.clone().into();
+                    let rcq: Option<samplerate::ConverterType> = rcq.clone().map(|x| x.into());
+
                     let channel_delta: i32 =
                         spec.channels as i32 - sample.metadata().channels as i32;
 
@@ -151,29 +213,29 @@ where
                         sample,
                     )?;
 
-                    let mut writer = hound::WavWriter::new(BufWriter::new(dst), *spec)
+                    let mut writer = hound::WavWriter::new(BufWriter::new(dst), spec)
                         .map_err(|e| Error::WavEncoderError(e.to_string()))?;
 
                     let in_channels = sample.metadata().channels;
 
                     match &spec.sample_format {
                         hound::SampleFormat::Float => {
-                            convert::<f32>(samples, in_channels, chanmap, rateconv, *rcq)?
+                            convert::<f32>(samples, in_channels, chanmap, rateconv, rcq)?
                                 .into_iter()
                                 .map(|s| writer.write_sample(s))
                                 .consume()
                         }
 
                         hound::SampleFormat::Int => match spec.bits_per_sample {
-                            32 => convert::<i32>(samples, in_channels, chanmap, rateconv, *rcq)?
+                            32 => convert::<i32>(samples, in_channels, chanmap, rateconv, rcq)?
                                 .into_iter()
                                 .map(|s| writer.write_sample(s))
                                 .consume(),
-                            16 => convert::<i16>(samples, in_channels, chanmap, rateconv, *rcq)?
+                            16 => convert::<i16>(samples, in_channels, chanmap, rateconv, rcq)?
                                 .into_iter()
                                 .map(|s| writer.write_sample(s))
                                 .consume(),
-                            8 => convert::<i8>(samples, in_channels, chanmap, rateconv, *rcq)?
+                            8 => convert::<i8>(samples, in_channels, chanmap, rateconv, rcq)?
                                 .into_iter()
                                 .map(|s| writer.write_sample(s))
                                 .consume(),
