@@ -25,4 +25,5 @@ symphonia = { version = "0.5.4", features = ["all-codecs"] }
 thiserror = "1.0.58"
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
 md-5 = "0.10.6"
+hound = "3.5.1"
 samplerate = "0.2.4"

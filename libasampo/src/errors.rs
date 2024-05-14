@@ -36,6 +36,9 @@ pub enum Error {
     #[error("Missing source: {0}")]
     MissingSourceError(Uuid),
 
+    #[error("WAV encoder error: {0}")]
+    WavEncoderError(String),
+
     #[error("Sample rate conversion error: {0}")]
     SampleConversionError(String),
 }
