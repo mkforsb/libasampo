@@ -22,8 +22,8 @@ use crate::{
 pub trait IO {
     type Writable: 'static + Write + Seek;
 
-    fn create_dir_all(&mut self, path: &Path) -> Result<(), Error>;
-    fn file_create(&mut self, path: &Path) -> Result<Self::Writable, Error>;
+    fn create_dirs(&mut self, path: &Path) -> Result<(), Error>;
+    fn create_file(&mut self, path: &Path) -> Result<Self::Writable, Error>;
 }
 
 pub struct DefaultIO;
@@ -31,11 +31,11 @@ pub struct DefaultIO;
 impl IO for DefaultIO {
     type Writable = File;
 
-    fn create_dir_all(&mut self, path: &Path) -> Result<(), Error> {
+    fn create_dirs(&mut self, path: &Path) -> Result<(), Error> {
         Ok(std::fs::create_dir_all(path)?)
     }
 
-    fn file_create(&mut self, path: &Path) -> Result<Self::Writable, Error> {
+    fn create_file(&mut self, path: &Path) -> Result<Self::Writable, Error> {
         Ok(File::create(path)?)
     }
 }
@@ -155,7 +155,7 @@ where
         let target_path = Path::new(&self.target_directory);
 
         self.io
-            .create_dir_all(target_path)
+            .create_dirs(target_path)
             .map_err(|e| Error::IoError {
                 uri: target_path.to_string_lossy().to_string(),
                 details: e.to_string(),
@@ -175,7 +175,7 @@ where
                 None => filename.push(sample.name()),
             }
 
-            let mut dst = self.io.file_create(&filename).map_err(|e| Error::IoError {
+            let mut dst = self.io.create_file(&filename).map_err(|e| Error::IoError {
                 uri: filename.to_string_lossy().to_string(),
                 details: e.to_string(),
             })?;
@@ -302,11 +302,11 @@ mod tests {
     impl IO for MockIO {
         type Writable = MockIOWritable;
 
-        fn create_dir_all(&mut self, _path: &Path) -> Result<(), Error> {
+        fn create_dirs(&mut self, _path: &Path) -> Result<(), Error> {
             Ok(())
         }
 
-        fn file_create(&mut self, path: &Path) -> Result<Self::Writable, Error> {
+        fn create_file(&mut self, path: &Path) -> Result<Self::Writable, Error> {
             let writable = MockIOWritable(Rc::new(RefCell::new(Vec::new())));
 
             self.writable
