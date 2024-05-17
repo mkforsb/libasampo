@@ -24,8 +24,8 @@ use crate::{
 pub trait IO: Clone + Send + Sync {
     type Writable: 'static + Write + Seek;
 
-    fn create_dirs(&mut self, path: &Path) -> Result<(), Error>;
-    fn create_file(&mut self, path: &Path) -> Result<Self::Writable, Error>;
+    fn create_dirs(&self, path: &Path) -> Result<(), Error>;
+    fn create_file(&self, path: &Path) -> Result<Self::Writable, Error>;
 }
 
 #[derive(Debug, Clone)]
@@ -34,11 +34,11 @@ pub struct DefaultIO;
 impl IO for DefaultIO {
     type Writable = File;
 
-    fn create_dirs(&mut self, path: &Path) -> Result<(), Error> {
+    fn create_dirs(&self, path: &Path) -> Result<(), Error> {
         Ok(std::fs::create_dir_all(path)?)
     }
 
-    fn create_file(&mut self, path: &Path) -> Result<Self::Writable, Error> {
+    fn create_file(&self, path: &Path) -> Result<Self::Writable, Error> {
         Ok(File::create(path)?)
     }
 }
@@ -407,12 +407,12 @@ mod tests {
     impl IO for MockIO {
         type Writable = MockIOWritable;
 
-        fn create_dirs(&mut self, _path: &Path) -> Result<(), Error> {
+        fn create_dirs(&self, _path: &Path) -> Result<(), Error> {
             Ok(())
         }
 
-        fn create_file(&mut self, path: &Path) -> Result<Self::Writable, Error> {
-            let writable = MockIOWritable(Rc::new(RefCell::new(Vec::new())));
+        fn create_file(&self, path: &Path) -> Result<Self::Writable, Error> {
+            let writable = MockIOWritable(Arc::new(Mutex::new(Vec::new())));
 
             self.writable
                 .try_lock()
