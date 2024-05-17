@@ -7,13 +7,13 @@ use std::{error::Error as StdError, io};
 use thiserror::Error as ThisError;
 use uuid::Uuid;
 
-#[derive(ThisError, Debug)]
+#[derive(ThisError, Debug, Clone)]
 pub enum Error {
     #[error("I/O error for \"{uri}\": {details}")]
     IoError { uri: String, details: String },
 
     #[error("Symphonia error: {0}")]
-    SymphoniaError(#[from] symphonia::core::errors::Error),
+    SymphoniaError(String),
 
     #[error("Symphonia error: No default track")]
     SymphoniaNoDefaultTrackError,

@@ -43,7 +43,7 @@ pub fn audio_hash(reader: SourceReader) -> Result<String, Error> {
 
             Ok(format!("{:x}", hasher.finalize()))
         }
-        Err(e) => Err(Error::SymphoniaError(e)),
+        Err(e) => Err(Error::SymphoniaError(e.to_string())),
     }
 }
 

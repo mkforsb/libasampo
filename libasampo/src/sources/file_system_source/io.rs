@@ -142,7 +142,7 @@ impl IO for DefaultIO {
                     },
                 })
             }
-            Err(e) => Err(e.into()),
+            Err(e) => Err(Error::SymphoniaError(e.to_string())),
         }
     }
 }

@@ -169,8 +169,9 @@ pub fn decode(source: &Source, sample: &Sample) -> Result<Vec<f32>, Error> {
                 .ok_or(Error::SymphoniaNoDefaultTrackError)?
                 .codec_params;
 
-            let mut decoder =
-                symphonia::default::get_codecs().make(codec_params, &Default::default())?;
+            let mut decoder = symphonia::default::get_codecs()
+                .make(codec_params, &Default::default())
+                .map_err(|e| Error::SymphoniaError(e.to_string()))?;
 
             let mut reader = probed.format;
 
@@ -198,7 +199,7 @@ pub fn decode(source: &Source, sample: &Sample) -> Result<Vec<f32>, Error> {
 
             Ok(output)
         }
-        Err(e) => Err(Error::SymphoniaError(e)),
+        Err(e) => Err(Error::SymphoniaError(e.to_string())),
     }
 }
 
