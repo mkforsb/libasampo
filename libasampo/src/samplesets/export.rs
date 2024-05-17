@@ -164,11 +164,11 @@ where
         tx: Option<std::sync::mpsc::Sender<ExportJobMessage>>,
     ) {
         macro_rules! send_or_log {
-            ($tx:ident, $msg:expr) => {
+            ($tx:ident, $msg:expr) => {{
                 let _ = $tx.send($msg).inspect_err(|e| {
                     log::log!(log::Level::Error, "Failed send on channel: {e}");
                 });
-            };
+            }};
         }
 
         let target_path = Path::new(&self.target_directory);
@@ -182,9 +182,9 @@ where
             }) {
             Ok(_) => (),
             Err(e) => {
-                tx.map(|tx| {
-                    send_or_log!(tx, ExportJobMessage::Error(e));
-                });
+                if let Some(tx) = tx {
+                    send_or_log!(tx, ExportJobMessage::Error(e))
+                }
                 return;
             }
         }
@@ -324,9 +324,9 @@ where
             if completed != prev_completed {
                 prev_completed = completed;
 
-                tx.as_ref().map(|tx| {
-                    send_or_log!(tx, ExportJobMessage::ItemsCompleted(completed));
-                });
+                if let Some(tx) = tx.as_ref() {
+                    send_or_log!(tx, ExportJobMessage::ItemsCompleted(completed))
+                }
             }
 
             if completed >= sampleset.len() {
@@ -335,12 +335,12 @@ where
 
             match rayon_rx.try_recv() {
                 Ok(err) => {
-                    tx.map(|tx| {
+                    if let Some(tx) = tx {
                         send_or_log!(
                             tx,
                             ExportJobMessage::Error(Error::ExportError(Box::new(err)))
-                        );
-                    });
+                        )
+                    }
                     return;
                 }
 
@@ -351,9 +351,9 @@ where
             }
         }
 
-        tx.map(|tx| {
-            send_or_log!(tx, ExportJobMessage::Finished);
-        });
+        if let Some(tx) = tx {
+            send_or_log!(tx, ExportJobMessage::Finished)
+        }
     }
 }
 
