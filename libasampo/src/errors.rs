@@ -41,6 +41,12 @@ pub enum Error {
 
     #[error("Sample rate conversion error: {0}")]
     SampleConversionError(String),
+
+    #[error("Export error: {0}")]
+    ExportError(#[from] Box<Error>),
+
+    #[error("Export threading error: {0}")]
+    ExportThreadingError(String),
 }
 
 impl Error {

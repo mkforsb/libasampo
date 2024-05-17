@@ -9,6 +9,8 @@ use std::{
     path::Path,
 };
 
+use rayon::prelude::*;
+use rayon_progress::ProgressAdaptor;
 use uuid::Uuid;
 
 use crate::{
@@ -19,13 +21,14 @@ use crate::{
     sources::Source,
 };
 
-pub trait IO {
+pub trait IO: Clone + Send + Sync {
     type Writable: 'static + Write + Seek;
 
     fn create_dirs(&mut self, path: &Path) -> Result<(), Error>;
     fn create_file(&mut self, path: &Path) -> Result<Self::Writable, Error>;
 }
 
+#[derive(Debug, Clone)]
 pub struct DefaultIO;
 
 impl IO for DefaultIO {
@@ -143,129 +146,220 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ExportJobMessage {
+    ItemsCompleted(usize),
+    Error(Error),
+    Finished,
+}
+
 impl<T> ExportJob<T>
 where
-    T: IO,
+    T: IO + 'static,
 {
     pub fn perform(
-        &mut self,
+        &self,
         sampleset: &SampleSet,
         sources: &HashMap<Uuid, Source>,
-    ) -> Result<(), Error> {
+        tx: Option<std::sync::mpsc::Sender<ExportJobMessage>>,
+    ) {
+        macro_rules! send_or_log {
+            ($tx:ident, $msg:expr) => {
+                let _ = $tx.send($msg).inspect_err(|e| {
+                    log::log!(log::Level::Error, "Failed send on channel: {e}");
+                });
+            };
+        }
+
         let target_path = Path::new(&self.target_directory);
 
-        self.io
+        match self
+            .io
             .create_dirs(target_path)
             .map_err(|e| Error::IoError {
                 uri: target_path.to_string_lossy().to_string(),
                 details: e.to_string(),
-            })?;
-
-        for sample in sampleset.list().iter() {
-            let source_uuid = sample
-                .source_uuid()
-                .ok_or(Error::SampleMissingSourceUUIDError(
-                    sample.uri().to_string(),
-                ))?;
-
-            let mut filename = target_path.to_path_buf();
-
-            match &self.conversion {
-                Some(Conversion::Wav(..)) => filename.push(format!("{}.wav", sample.name())),
-                None => filename.push(sample.name()),
-            }
-
-            let mut dst = self.io.create_file(&filename).map_err(|e| Error::IoError {
-                uri: filename.to_string_lossy().to_string(),
-                details: e.to_string(),
-            })?;
-
-            match &self.conversion {
-                Some(Conversion::Wav(spec, rcq)) => {
-                    let spec: hound::WavSpec = spec.clone().into();
-                    let rcq: Option<samplerate::ConverterType> = rcq.clone().map(|x| x.into());
-
-                    let channel_delta: i32 =
-                        spec.channels as i32 - sample.metadata().channels as i32;
-
-                    let chanmap = match (channel_delta, sample.metadata().channels, spec.channels) {
-                        (0, _, _) => Ok(ChannelMapping::Passthrough),
-                        (_, 1, 2) => Ok(ChannelMapping::MonoToStereo),
-                        (_, 2, 1) => Ok(ChannelMapping::StereoToMono),
-                        _ => Err(Error::SampleConversionError(
-                            "Unsupported channel mapping".to_string(),
-                        )),
-                    }?;
-
-                    let rateconv = if sample.metadata().rate != spec.sample_rate {
-                        Some(RateConversion {
-                            from: sample.metadata().rate,
-                            to: spec.sample_rate,
-                        })
-                    } else {
-                        None
-                    };
-
-                    let samples = decode(
-                        sources
-                            .get(source_uuid)
-                            .ok_or(Error::MissingSourceError(*source_uuid))?,
-                        sample,
-                    )?;
-
-                    let mut writer = hound::WavWriter::new(BufWriter::new(dst), spec)
-                        .map_err(|e| Error::WavEncoderError(e.to_string()))?;
-
-                    let in_channels = sample.metadata().channels;
-
-                    match &spec.sample_format {
-                        hound::SampleFormat::Float => {
-                            convert::<f32>(samples, in_channels, chanmap, rateconv, rcq)?
-                                .into_iter()
-                                .map(|s| writer.write_sample(s))
-                                .consume()
-                        }
-
-                        hound::SampleFormat::Int => match spec.bits_per_sample {
-                            32 => convert::<i32>(samples, in_channels, chanmap, rateconv, rcq)?
-                                .into_iter()
-                                .map(|s| writer.write_sample(s))
-                                .consume(),
-                            16 => convert::<i16>(samples, in_channels, chanmap, rateconv, rcq)?
-                                .into_iter()
-                                .map(|s| writer.write_sample(s))
-                                .consume(),
-                            8 => convert::<i8>(samples, in_channels, chanmap, rateconv, rcq)?
-                                .into_iter()
-                                .map(|s| writer.write_sample(s))
-                                .consume(),
-                            _ => {
-                                return Err(Error::SampleConversionError(
-                                    "Unsupported bit depth".to_string(),
-                                ))
-                            }
-                        },
-                    }
-
-                    writer.finalize().unwrap();
-                }
-
-                None => {
-                    sources
-                        .get(source_uuid)
-                        .ok_or(Error::MissingSourceError(*source_uuid))?
-                        .raw_copy(sample, &mut dst)?;
-                }
+            }) {
+            Ok(_) => (),
+            Err(e) => {
+                tx.map(|tx| {
+                    send_or_log!(tx, ExportJobMessage::Error(e));
+                });
+                return;
             }
         }
 
-        Ok(())
+        let job_copy = self.clone();
+        let sources_copy = sources.clone();
+        let target_dir_copy = self.target_directory.clone();
+
+        let samplelist = sampleset.list().into_iter().cloned().collect::<Vec<_>>();
+
+        let it = ProgressAdaptor::new(samplelist);
+        let progress = it.items_processed();
+
+        let (rayon_tx, rayon_rx) = std::sync::mpsc::channel::<Error>();
+
+        rayon::spawn(move || {
+            let result = it.try_for_each(|sample| -> Result<(), Error> {
+                let source_uuid =
+                    sample
+                        .source_uuid()
+                        .ok_or(Error::SampleMissingSourceUUIDError(
+                            sample.uri().to_string(),
+                        ))?;
+
+                let mut filename = Path::new(&target_dir_copy).to_path_buf();
+
+                match &job_copy.conversion {
+                    Some(Conversion::Wav(..)) => filename.push(format!("{}.wav", sample.name())),
+                    None => filename.push(sample.name()),
+                }
+
+                let mut dst = job_copy
+                    .io
+                    .create_file(&filename)
+                    .map_err(|e| Error::IoError {
+                        uri: filename.to_string_lossy().to_string(),
+                        details: e.to_string(),
+                    })?;
+
+                match &job_copy.conversion {
+                    Some(Conversion::Wav(spec, rcq)) => {
+                        let spec: hound::WavSpec = spec.clone().into();
+                        let rcq: Option<samplerate::ConverterType> = rcq.clone().map(|x| x.into());
+
+                        let channel_delta: i32 =
+                            spec.channels as i32 - sample.metadata().channels as i32;
+
+                        let chanmap =
+                            match (channel_delta, sample.metadata().channels, spec.channels) {
+                                (0, _, _) => Ok(ChannelMapping::Passthrough),
+                                (_, 1, 2) => Ok(ChannelMapping::MonoToStereo),
+                                (_, 2, 1) => Ok(ChannelMapping::StereoToMono),
+                                _ => Err(Error::SampleConversionError(
+                                    "Unsupported channel mapping".to_string(),
+                                )),
+                            }?;
+
+                        let rateconv = if sample.metadata().rate != spec.sample_rate {
+                            Some(RateConversion {
+                                from: sample.metadata().rate,
+                                to: spec.sample_rate,
+                            })
+                        } else {
+                            None
+                        };
+
+                        let samples = decode(
+                            sources_copy
+                                .get(source_uuid)
+                                .ok_or(Error::MissingSourceError(*source_uuid))?,
+                            &sample,
+                        )?;
+
+                        let mut writer = hound::WavWriter::new(BufWriter::new(dst), spec)
+                            .map_err(|e| Error::WavEncoderError(e.to_string()))?;
+
+                        let in_channels = sample.metadata().channels;
+
+                        match &spec.sample_format {
+                            hound::SampleFormat::Float => {
+                                convert::<f32>(samples, in_channels, chanmap, rateconv, rcq)?
+                                    .into_iter()
+                                    .map(|s| writer.write_sample(s))
+                                    .consume()
+                            }
+
+                            hound::SampleFormat::Int => match spec.bits_per_sample {
+                                32 => convert::<i32>(samples, in_channels, chanmap, rateconv, rcq)?
+                                    .into_iter()
+                                    .map(|s| writer.write_sample(s))
+                                    .consume(),
+                                16 => convert::<i16>(samples, in_channels, chanmap, rateconv, rcq)?
+                                    .into_iter()
+                                    .map(|s| writer.write_sample(s))
+                                    .consume(),
+                                8 => convert::<i8>(samples, in_channels, chanmap, rateconv, rcq)?
+                                    .into_iter()
+                                    .map(|s| writer.write_sample(s))
+                                    .consume(),
+                                _ => {
+                                    return Err(Error::SampleConversionError(
+                                        "Unsupported bit depth".to_string(),
+                                    ))
+                                }
+                            },
+                        }
+
+                        writer.finalize().map_err(|e| Error::IoError {
+                            uri: sample.uri().to_string(),
+                            details: e.to_string(),
+                        })?;
+                    }
+
+                    None => {
+                        sources_copy
+                            .get(source_uuid)
+                            .ok_or(Error::MissingSourceError(*source_uuid))?
+                            .raw_copy(&sample, &mut dst)?;
+                    }
+                }
+                Ok(())
+            });
+
+            match result {
+                Ok(_) => (),
+                Err(e) => {
+                    send_or_log!(rayon_tx, e);
+                }
+            }
+        });
+
+        let mut prev_completed = 0;
+
+        loop {
+            let completed = progress.get();
+
+            if completed != prev_completed {
+                prev_completed = completed;
+
+                tx.as_ref().map(|tx| {
+                    send_or_log!(tx, ExportJobMessage::ItemsCompleted(completed));
+                });
+            }
+
+            if completed >= sampleset.len() {
+                break;
+            }
+
+            match rayon_rx.try_recv() {
+                Ok(err) => {
+                    tx.map(|tx| {
+                        send_or_log!(
+                            tx,
+                            ExportJobMessage::Error(Error::ExportError(Box::new(err)))
+                        );
+                    });
+                    return;
+                }
+
+                Err(e) => match e {
+                    std::sync::mpsc::TryRecvError::Empty => (),
+                    std::sync::mpsc::TryRecvError::Disconnected => break,
+                },
+            }
+        }
+
+        tx.map(|tx| {
+            send_or_log!(tx, ExportJobMessage::Finished);
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::{Arc, Mutex};
 
     use crate::{
         samplesets::BaseSampleSet,
@@ -275,16 +369,27 @@ mod tests {
     use super::*;
 
     #[derive(Debug, Clone)]
-    struct MockIOWritable(Rc<RefCell<Vec<u8>>>);
+    struct MockIOWritable(Arc<Mutex<Vec<u8>>>);
 
     #[derive(Debug, Clone)]
     struct MockIO {
-        pub writable: HashMap<String, MockIOWritable>,
+        pub writable: Arc<Mutex<HashMap<String, MockIOWritable>>>,
     }
 
     impl std::io::Write for MockIOWritable {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.borrow_mut().extend_from_slice(buf);
+            self.0
+                .try_lock()
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        Error::IoError {
+                            uri: "???".to_string(),
+                            details: e.to_string(),
+                        },
+                    )
+                })?
+                .extend_from_slice(buf);
             Ok(buf.len())
         }
 
@@ -310,6 +415,8 @@ mod tests {
             let writable = MockIOWritable(Rc::new(RefCell::new(Vec::new())));
 
             self.writable
+                .try_lock()
+                .unwrap()
                 .insert(path.to_string_lossy().to_string(), writable.clone());
 
             Ok(writable)
@@ -337,25 +444,34 @@ mod tests {
         set.add(&source, s1.clone()).unwrap();
         set.add(&source, s2.clone()).unwrap();
 
-        let mut job = ExportJob {
+        let job = ExportJob {
             io: MockIO {
-                writable: HashMap::new(),
+                writable: Arc::new(Mutex::new(HashMap::new())),
             },
             target_directory: "/tmp".to_string(),
             conversion: None,
         };
 
-        job.perform(&set, &vec![(*source.uuid(), source)].into_iter().collect())
-            .unwrap();
+        job.perform(
+            &set,
+            &vec![(*source.uuid(), source)].into_iter().collect(),
+            None,
+        );
 
         unsafe {
-            let s1_writable = job.io.writable.get("/tmp/1.wav").unwrap().0.borrow();
-            let (_, s1_vals, _) = s1_writable.as_slice().align_to::<f32>();
-            assert_eq!(s1_vals, &[1.0, -1.0, 1.0]);
+            {
+                let s1_writable = job.io.writable.try_lock().unwrap();
+                let s1_writable = s1_writable.get("/tmp/1.wav").unwrap().0.try_lock().unwrap();
+                let (_, s1_vals, _) = s1_writable.as_slice().align_to::<f32>();
+                assert_eq!(s1_vals, &[1.0, -1.0, 1.0]);
+            }
 
-            let s2_writable = job.io.writable.get("/tmp/2.wav").unwrap().0.borrow();
-            let (_, s2_vals, _) = s2_writable.as_slice().align_to::<f32>();
-            assert_eq!(s2_vals, &[-2.0, 2.0, -2.0, 2.0]);
+            {
+                let s2_writable = job.io.writable.try_lock().unwrap();
+                let s2_writable = s2_writable.get("/tmp/2.wav").unwrap().0.try_lock().unwrap();
+                let (_, s2_vals, _) = s2_writable.as_slice().align_to::<f32>();
+                assert_eq!(s2_vals, &[-2.0, 2.0, -2.0, 2.0]);
+            }
         }
     }
 }

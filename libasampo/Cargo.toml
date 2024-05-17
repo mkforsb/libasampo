@@ -27,3 +27,5 @@ uuid = { version = "1.8.0", features = ["v4", "serde"] }
 md-5 = "0.10.6"
 hound = "3.5.1"
 samplerate = "0.2.4"
+rayon = "1.10.0"
+rayon-progress = "1.0.0"
