@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use std::fs::File;
 use std::io::{Read, Seek};
+use std::sync::mpsc::Sender;
 
 use uuid::Uuid;
 
@@ -93,6 +94,7 @@ pub trait SourceOps: PartialEq + Clone + std::fmt::Debug {
     fn uri(&self) -> &str;
     fn uuid(&self) -> &Uuid;
     fn list(&self) -> Result<Vec<Sample>, Error>;
+    fn list_async(&self, tx: Sender<Result<Sample, Error>>);
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error>;
 
     fn raw_copy<T: 'static + std::io::Write>(
@@ -116,6 +118,7 @@ mockall::mock! {
         fn uri(&self) -> &str;
         fn uuid(&self) -> &Uuid;
         fn list(&self) -> Result<Vec<Sample>, Error>;
+        fn list_async(&self, tx: Sender<Result<Sample, Error>>);
         fn stream(&self, sample: &Sample) -> Result<SourceReader, Error>;
 
         fn raw_copy<T: 'static + std::io::Write>(
@@ -179,6 +182,7 @@ impl SourceOps for Source {
             Self::FakeSource(src) => src.name.as_deref(),
         }
     }
+
     fn uri(&self) -> &str {
         match self {
             Self::FilesystemSource(src) => src.uri(),
@@ -215,6 +219,18 @@ impl SourceOps for Source {
                 Some(error) => Err(error()),
                 None => Ok(src.list.clone()),
             },
+        }
+    }
+
+    fn list_async(&self, tx: Sender<Result<Sample, Error>>) {
+        match self {
+            Self::FilesystemSource(src) => src.list_async(tx),
+
+            #[cfg(feature = "mocks")]
+            Self::MockSource(src) => src.list_async(tx),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSource(_src) => unimplemented!(),
         }
     }
 

@@ -117,7 +117,7 @@ where
     }
 
     fn list(&self) -> Result<Vec<Sample>, Error> {
-        let mut result = Vec::<_>::new();
+        let mut result = Vec::new();
 
         for ext in self.exts.iter() {
             result.extend(
@@ -130,6 +130,41 @@ where
         }
 
         Ok(result)
+    }
+
+    fn list_async(&self, tx: std::sync::mpsc::Sender<Result<Sample, Error>>) {
+        let mut files = Vec::new();
+
+        for ext in self.exts.iter() {
+            match self.io.glob(format!("{}/**/*.{ext}", self.path).as_str()) {
+                Ok(stuff) => {
+                    files.extend(stuff.log_and_discard_errors(log::Level::Error));
+                }
+                Err(e) => {
+                    let _ = tx
+                        .send(Err(Error::IoError {
+                            uri: self.path.clone(),
+                            details: e.to_string(),
+                        }))
+                        .inspect_err(|e2| {
+                            log::log!(
+                                log::Level::Error,
+                                "Failed sending error: {e2} (original error: {e})"
+                            );
+                        });
+                }
+            }
+        }
+
+        for sample in files
+            .iter()
+            .map(|f| self.sample_from_path(&f))
+            .log_and_discard_errors(log::Level::Error)
+        {
+            let _ = tx
+                .send(Ok(sample))
+                .inspect_err(|e| log::log!(log::Level::Error, "Failed sending sample: {e}"));
+        }
     }
 
     fn stream(&self, sample: &Sample) -> Result<SourceReader, Error> {
