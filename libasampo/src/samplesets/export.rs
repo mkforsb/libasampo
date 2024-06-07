@@ -379,7 +379,7 @@ mod tests {
     impl std::io::Write for MockIOWritable {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
             self.0
-                .try_lock()
+                .lock()
                 .map_err(|e| {
                     std::io::Error::new(
                         std::io::ErrorKind::Other,
@@ -415,7 +415,7 @@ mod tests {
             let writable = MockIOWritable(Arc::new(Mutex::new(Vec::new())));
 
             self.writable
-                .try_lock()
+                .lock()
                 .unwrap()
                 .insert(path.to_string_lossy().to_string(), writable.clone());
 
