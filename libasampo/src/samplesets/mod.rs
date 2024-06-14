@@ -35,6 +35,13 @@ pub enum DrumkitLabel {
     Tom3,
 }
 
+pub trait ConcreteSampleSetLabelling {
+    type Label: std::fmt::Debug + Clone;
+
+    fn get(&self, uri: &SampleURI) -> Option<&Self::Label>;
+    fn set(&mut self, uri: SampleURI, label: Self::Label);
+}
+
 pub trait SampleSetLabellingOps {
     fn contains(&self, uri: &SampleURI) -> bool;
     fn remove(&mut self, uri: &SampleURI) -> Result<(), Error>;
@@ -54,12 +61,16 @@ impl DrumkitLabelling {
             labels: HashMap::new(),
         }
     }
+}
 
-    pub fn get(&self, uri: &SampleURI) -> Option<&DrumkitLabel> {
+impl ConcreteSampleSetLabelling for DrumkitLabelling {
+    type Label = DrumkitLabel;
+
+    fn get(&self, uri: &SampleURI) -> Option<&DrumkitLabel> {
         self.labels.get(uri)
     }
 
-    pub fn set(&mut self, uri: SampleURI, label: DrumkitLabel) {
+    fn set(&mut self, uri: SampleURI, label: DrumkitLabel) {
         self.labels.insert(uri, label);
     }
 }

@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     errors::Error,
+    prelude::ConcreteSampleSetLabelling,
     samples::SampleOps,
     samplesets::{SampleSetLabelling, SampleSetOps},
     serialize::{TryFromDomain, TryIntoDomain},
