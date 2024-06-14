@@ -4,4 +4,5 @@
 
 pub use crate::samples::SampleOps;
 pub use crate::samplesets::{ConcreteSampleSetLabelling, SampleSetLabellingOps, SampleSetOps};
+pub use crate::sequences::StepSequenceOps;
 pub use crate::sources::{SourceOps, SourceReaderOps};
