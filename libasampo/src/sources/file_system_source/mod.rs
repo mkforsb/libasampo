@@ -158,7 +158,7 @@ where
 
         for sample in files
             .iter()
-            .map(|f| self.sample_from_path(&f))
+            .map(|f| self.sample_from_path(f))
             .log_and_discard_errors(log::Level::Error)
         {
             let _ = tx
