@@ -10,10 +10,29 @@ use symphonia::core::{
 
 use crate::{errors::Error, prelude::SourceOps, samples::Sample, sources::Source};
 
+pub struct U8GreaterThanTwo {
+    value: u8,
+}
+
+impl TryFrom<u8> for U8GreaterThanTwo {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value > 2 {
+            Ok(U8GreaterThanTwo { value })
+        } else {
+            Err(Error::ValueOutOfRangeError(
+                "Value must be greater than 2".to_string(),
+            ))
+        }
+    }
+}
+
 pub enum ChannelMapping {
     Passthrough,
     MonoToStereo,
     StereoToMono,
+    TruncateToStereo { input_channels: U8GreaterThanTwo },
 }
 
 pub struct RateConversion {
@@ -95,6 +114,19 @@ where
                     (Some(a), Some(b)) => Some(T::convert((a + b) / 2.0)),
                     _ => None,
                 },
+                ChannelMapping::TruncateToStereo { ref input_channels } => {
+                    match (self.samples.next(), self.samples.next()) {
+                        (Some(a), Some(b)) => {
+                            for _ in 0..(input_channels.value - 2) {
+                                let _ = self.samples.next();
+                            }
+
+                            self.outstack.push(T::convert(b));
+                            Some(T::convert(a))
+                        }
+                        _ => None,
+                    }
+                }
             }
         }
     }
@@ -268,6 +300,23 @@ mod tests {
             )
             .unwrap(),
             vec![0.1, 0.2, 0.3]
+        )
+    }
+
+    #[test]
+    fn test_truncate_to_stereo() {
+        assert_eq!(
+            convert::<f32>(
+                vec![0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.3, 0.3, 0.3, 0.3],
+                5,
+                ChannelMapping::TruncateToStereo {
+                    input_channels: 5.try_into().unwrap()
+                },
+                None,
+                None
+            )
+            .unwrap(),
+            vec![0.1, 0.1, 0.2, 0.2, 0.3, 0.3]
         )
     }
 

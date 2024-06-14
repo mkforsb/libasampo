@@ -47,6 +47,9 @@ pub enum Error {
 
     #[error("Export threading error: {0}")]
     ExportThreadingError(String),
+
+    #[error("Value out of range: {0}")]
+    ValueOutOfRangeError(String),
 }
 
 impl Error {
