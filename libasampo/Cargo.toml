@@ -9,7 +9,7 @@ ignored = ["md-5"]
 [features]
 mocks = ["dep:mockall"]
 fakes = []
-drum-machine-wav-output-tests = []
+wav-output-tests = []
 
 [dev-dependencies]
 byteorder = "1.5.0"

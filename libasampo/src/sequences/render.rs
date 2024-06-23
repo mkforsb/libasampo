@@ -506,7 +506,7 @@ mod tests {
         let _ = writer.finalize();
     }
 
-    #[cfg_attr(not(feature = "drum-machine-wav-output-tests"), ignore)]
+    #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat() {
         let mut renderer = DrumkitSequenceRenderer::new(
@@ -526,7 +526,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(not(feature = "drum-machine-wav-output-tests"), ignore)]
+    #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat_bpm_swing_changes() {
         let mut renderer = DrumkitSequenceRenderer::new(
@@ -563,7 +563,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(not(feature = "drum-machine-wav-output-tests"), ignore)]
+    #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat_step_changes() {
         let mut renderer = DrumkitSequenceRenderer::new(
@@ -601,7 +601,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(not(feature = "drum-machine-wav-output-tests"), ignore)]
+    #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat_sample_swap() {
         let mut renderer = DrumkitSequenceRenderer::new(
