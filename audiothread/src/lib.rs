@@ -3,7 +3,7 @@
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
 use std::{
-    cell::{BorrowMutError, RefCell, RefMut},
+    cell::RefCell,
     collections::HashMap,
     rc::Rc,
     sync::mpsc::{self, RecvTimeoutError, Sender},
@@ -136,10 +136,6 @@ fn recv_all(
     }
 }
 
-fn grab<T>(r: Result<RefMut<Option<T>>, BorrowMutError>) -> Option<RefMut<T>> {
-    r.map(|x| RefMut::map(x, |y| y.as_mut().unwrap())).ok()
-}
-
 pub fn spawn(rx: mpsc::Receiver<Message>, opts: Option<Opts>) -> JoinHandle<()> {
     thread::spawn(move || threadloop(rx, opts))
 }
@@ -164,163 +160,167 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
     let mut pa_mainloop =
         PulseMainloop::new().expect("Libpulse should be able to allocate a mainloop");
 
-    let pa_context = Rc::new(RefCell::new(
-        PulseContext::new(&pa_mainloop, &opts.stream_name)
-            .expect("Libpulse should be able to allocate a context"),
-    ));
-    let pa_context_csc = Rc::clone(&pa_context);
+    let mut pa_context = PulseContext::new(&pa_mainloop, &opts.stream_name)
+        .expect("Libpulse should be able to alloate a context");
 
-    let pa_stream: Rc<RefCell<Option<PulseStream>>> = Rc::new(RefCell::new(None));
-    let pa_stream_csc = Rc::clone(&pa_stream);
-    let pa_stream_ssc = Rc::clone(&pa_stream);
-    let pa_stream_srw = Rc::clone(&pa_stream);
+    let pa_context_raw: *mut PulseContext = &mut pa_context;
+    let pa_context_csc = pa_context_raw.clone();
 
     let sourcegroups: Rc<RefCell<HashMap<AudioSpec, SourceGroup>>> =
         Rc::new(RefCell::new(HashMap::new()));
 
     let sourcegroups_srw = Rc::clone(&sourcegroups);
 
-    let stream_ready_write = move |n: usize| {
-        debug_assert!(n % framesize_bytes == 0);
-
-        match grab(pa_stream_srw.try_borrow_mut()) {
-            Some(ref mut s) => match s.begin_write(Some(n)) {
-                Ok(Some(ref mut buf)) => {
-                    // TODO: skip if no sources are playing.
-                    //       complication: the buffer received from .begin_write may need to
-                    //       to be zeroed once after the last playing source is dropped.
-                    unsafe {
-                        let (prefix, buf_f32, suffix) = buf.align_to_mut::<f32>();
-
-                        debug_assert!(prefix.is_empty());
-                        debug_assert!(suffix.is_empty());
-
-                        buf_f32.fill(0.0);
-
-                        for (spec, group) in sourcegroups_srw.borrow_mut().iter_mut() {
-                            if *spec == output_spec {
-                                for source in group.sources_iter_mut() {
-                                    source.mix_to_same_spec(buf_f32);
-                                }
-                            } else {
-                                group.mix_to_given_spec(output_spec, buf_f32);
-                            }
-                        }
-                    }
-
-                    if let Err(e) = s.write(buf, None, 0, SeekMode::Relative) {
-                        log::log!(log::Level::Warn, "Error writing to stream: {:?}", e);
-                    }
-                }
-                Ok(None) => log::log!(
-                    log::Level::Error,
-                    "Stream ready for writing, but .begin_write failed to provide a buffer"
-                ),
-                Err(e) => log::log!(
-                    log::Level::Error,
-                    "Stream ready for writing, but .begin_write failed with error {:?}",
-                    e
-                ),
-            },
-
-            // State/logic bug, if it ever happens
-            None => panic!("Stream ready for writing, but not able to be borrowed or not present"),
-        }
+    let context_state_changed = move || {
+        log::log!(log::Level::Debug, "Context state changed: {:?}", unsafe {
+            (*pa_context_csc).get_state()
+        })
     };
 
-    let stream_state_changed = move || {
-        #[allow(clippy::single_match)]
-        match pa_stream_ssc.try_borrow() {
-            Ok(ref stream_opt) => match stream_opt.as_ref() {
-                Some(stream) => log::log!(
-                    log::Level::Debug,
-                    "Stream state changed: {:?}",
-                    stream.get_state()
-                ),
-                None => (),
-            },
-            Err(_) => (),
-        }
-    };
-
-    let context_state_changed = move || match pa_context_csc.try_borrow_mut() {
-        Ok(ref mut ctx) => {
-            log::log!(
-                log::Level::Debug,
-                "Context state changed: {:?}",
-                ctx.get_state()
-            );
-
-            if pa_stream_csc.try_borrow_mut().is_ok() {
-                let have_stream = pa_stream_csc.borrow_mut().is_some();
-
-                if !have_stream {
-                    let mut s = PulseStream::new(ctx, "stream", &pulse_spec, None)
-                        .expect("Libpulse should be able to allocate a stream");
-
-                    s.set_state_callback(Some(Box::new(stream_state_changed.clone())));
-                    s.set_write_callback(Some(Box::new(stream_ready_write.clone())));
-
-                    pa_stream_csc.replace(Some(s));
-
-                    log::log!(log::Level::Info, "Stream created");
-                }
-            }
-        }
-        Err(_) => log::log!(log::Level::Debug, "Context state changed: {{n/a}}"),
-    };
+    pa_context.set_state_callback(Some(Box::new(context_state_changed)));
 
     pa_context
-        .borrow_mut()
-        .set_state_callback(Some(Box::new(context_state_changed.clone())));
-
-    pa_context
-        .borrow_mut()
         .connect(None, PulseContextFlagSet::NOAUTOSPAWN, None)
         .expect("We should be able to connect to PulseAudio");
 
     log::log!(
         log::Level::Info,
         "Connected to server {:?}",
-        pa_context.borrow().get_server()
+        pa_context.get_server()
     );
 
-    let mut stream_asked_connect = false;
-    let mut stream_created = false;
+    let context_ready_timer = std::time::Instant::now();
+    let context_ready_timeout = std::time::Duration::from_secs(5);
 
-    let mut since_cleanup = Instant::now();
-
-    let mut n_sources_playing_prev = 0;
-
-    loop {
-        pa_mainloop.iterate(false);
-
-        if !stream_created {
-            stream_created = pa_stream.borrow().is_some();
-        }
-
-        if stream_created && !stream_asked_connect {
-            #[allow(clippy::single_match)]
-            match pa_stream.borrow_mut().as_mut().unwrap().connect_playback(
-                None,
-                // None,
-                Some(&PulseBufferAttr {
-                    maxlength: (opts.buffer_size.get() * framesize_bytes) as u32,
-                    tlength: (opts.buffer_size.get() * framesize_bytes) as u32,
-                    prebuf: 0,
-                    minreq: (opts.buffer_size.get() * framesize_bytes) as u32,
-                    fragsize: 0,
-                }),
-                PulseStreamFlagSet::ADJUST_LATENCY,
-                None,
-                None,
-            ) {
-                Ok(_) => stream_asked_connect = true,
-                _ => (),
+    while pa_context.get_state() != libpulse_binding::context::State::Ready {
+        match pa_mainloop.iterate(true) {
+            libpulse_binding::mainloop::standard::IterateResult::Success(_) => (),
+            libpulse_binding::mainloop::standard::IterateResult::Quit(_) => {
+                panic!("PulseAudio quit while audiothread was connecting")
+            }
+            libpulse_binding::mainloop::standard::IterateResult::Err(e) => {
+                panic!("PulseAudio error while audiothread was connecting: {e}")
             }
         }
 
-        let mut quit = false;
+        if context_ready_timer.elapsed() > context_ready_timeout {
+            panic!("Timed out waiting for context to become ready");
+        }
+    }
+
+    let mut stream =
+        PulseStream::new(&mut pa_context, "My Stream", &pulse_spec, None).expect("stream");
+
+    let stream_raw: *mut PulseStream = &mut stream;
+    let stream_ssc = stream_raw.clone();
+    let stream_srw = stream_raw.clone();
+
+    let stream_state_changed = move || {
+        log::log!(log::Level::Debug, "Stream state changed: {:?}", unsafe {
+            (*stream_ssc).get_state()
+        },);
+    };
+
+    stream.set_state_callback(Some(Box::new(stream_state_changed)));
+
+    let stream_ready_write = move |n: usize| {
+        debug_assert!(n % framesize_bytes == 0);
+
+        // TODO: skip if no sources are playing.
+        //       complication: the buffer received from .begin_write may need to
+        //       to be zeroed once after the last playing source is dropped.
+        unsafe {
+            match (*stream_srw).begin_write(Some(n)) {
+                Ok(Some(ref mut buf)) => {
+                    let (prefix, buf_f32, suffix) = buf.align_to_mut::<f32>();
+
+                    debug_assert!(prefix.is_empty());
+                    debug_assert!(suffix.is_empty());
+
+                    buf_f32.fill(0.0);
+
+                    for (spec, group) in sourcegroups_srw.borrow_mut().iter_mut() {
+                        if *spec == output_spec {
+                            for source in group.sources_iter_mut() {
+                                source.mix_to_same_spec(buf_f32);
+                            }
+                        } else {
+                            group.mix_to_given_spec(output_spec, buf_f32);
+                        }
+                    }
+
+                    if let Err(e) = (*stream_srw).write(buf, None, 0, SeekMode::Relative) {
+                        log::log!(log::Level::Warn, "Error writing to stream: {:?}", e);
+                    }
+                }
+
+                Ok(None) => log::log!(
+                    log::Level::Error,
+                    "Stream ready for writing, but .begin_write failed to provide a buffer"
+                ),
+
+                Err(e) => log::log!(
+                    log::Level::Error,
+                    "Stream ready for writing, but .begin_write failed with error {:?}",
+                    e
+                ),
+            }
+        }
+    };
+
+    stream.set_write_callback(Some(Box::new(stream_ready_write)));
+
+    stream
+        .connect_playback(
+            None,
+            Some(&PulseBufferAttr {
+                maxlength: (opts.buffer_size.get() * framesize_bytes) as u32,
+                tlength: (opts.buffer_size.get() * framesize_bytes) as u32,
+                prebuf: 0,
+                minreq: (opts.buffer_size.get() * framesize_bytes) as u32,
+                fragsize: 0,
+            }),
+            PulseStreamFlagSet::ADJUST_LATENCY,
+            None,
+            None,
+        )
+        .expect("PulseAudio should let us connect our stream for playback");
+
+    let stream_ready_timer = std::time::Instant::now();
+    let stream_ready_timeout = std::time::Duration::from_secs(5);
+
+    while stream.get_state() != libpulse_binding::stream::State::Ready {
+        match pa_mainloop.iterate(true) {
+            libpulse_binding::mainloop::standard::IterateResult::Success(_) => (),
+            libpulse_binding::mainloop::standard::IterateResult::Quit(_) => {
+                panic!("PulseAudio quit while audiothread was creating a stream")
+            }
+            libpulse_binding::mainloop::standard::IterateResult::Err(e) => {
+                panic!("PulseAudio error while audiothread was creating a stream: {e}")
+            }
+        }
+
+        if stream_ready_timer.elapsed() > stream_ready_timeout {
+            panic!("Timed out waiting for stream to become ready");
+        }
+    }
+
+    let mut since_cleanup = Instant::now();
+    let mut n_sources_playing_prev = 0;
+    let mut quit = false;
+
+    loop {
+        match pa_mainloop.iterate(false) {
+            libpulse_binding::mainloop::standard::IterateResult::Success(_) => (),
+            libpulse_binding::mainloop::standard::IterateResult::Quit(_) => {
+                log::log!(log::Level::Error, "PulseAudio quit, shutting down");
+                break;
+            }
+            libpulse_binding::mainloop::standard::IterateResult::Err(e) => {
+                log::log!(log::Level::Error, "PulseAudio error: {e}, shutting down");
+                break;
+            }
+        }
 
         // FIXME: what if sleeping here causes underflow on the sound server?
         //        simple way to cause the issue is to play a very large number of
@@ -414,16 +414,11 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
 
     log::log!(log::Level::Info, "Audiothread shutting down gracefully");
 
-    if stream_asked_connect {
-        pa_stream
-            .borrow_mut()
-            .as_mut()
-            .unwrap()
-            .disconnect()
-            .expect("We should have disconnected from PulseAudio");
-    }
+    stream
+        .disconnect()
+        .expect("We should be able to disconnect from PulseAudio");
 
-    pa_context.borrow_mut().disconnect();
+    pa_context.disconnect();
 
     // is this needed/beneficial?
     pa_mainloop.quit(PulseRetval(0));
