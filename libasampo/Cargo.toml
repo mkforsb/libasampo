@@ -7,8 +7,8 @@ edition = "2021"
 ignored = ["md-5"]
 
 [features]
-mocks = ["dep:mockall"]
 fakes = []
+mocks = ["dep:mockall"]
 wav-output-tests = []
 
 [dev-dependencies]
@@ -17,16 +17,16 @@ json = "0.12.4"
 mockall = { version = "0.12.1" }
 
 [dependencies]
-mockall = { version = "0.12.1", optional = true }
 glob = "0.3.1"
+hound = "3.5.1"
 log = "0.4.21"
-serde = { version = "1.0.197", features = ["derive"] }
+md-5 = "0.10.6"
+mockall = { version = "0.12.1", optional = true }
+rayon = "1.10.0"
+rayon-progress = "1.0.0"
+samplerate = "0.2.4"
 serde_json = "1.0.115"
+serde = { version = "1.0.197", features = ["derive"] }
 symphonia = { version = "0.5.4", features = ["all-codecs"] }
 thiserror = "1.0.58"
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
-md-5 = "0.10.6"
-hound = "3.5.1"
-samplerate = "0.2.4"
-rayon = "1.10.0"
-rayon-progress = "1.0.0"
