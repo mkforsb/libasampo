@@ -27,6 +27,15 @@ pub struct SampleSetSampleLoader {
     sources: Vec<Source>,
 }
 
+impl SampleSetSampleLoader {
+    pub fn new(sample_set: SampleSet, sources: Vec<Source>) -> Self {
+        Self {
+            sample_set,
+            sources,
+        }
+    }
+}
+
 impl DrumkitSampleLoader for SampleSetSampleLoader {
     fn load_sample(&self, label_to_load: &DrumkitLabel) -> Option<(SampleMetadata, Vec<f32>)> {
         match self.sample_set.labelling() {

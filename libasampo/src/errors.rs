@@ -50,6 +50,9 @@ pub enum Error {
 
     #[error("Value out of range: {0}")]
     ValueOutOfRangeError(String),
+
+    #[error("Channel error: {0}")]
+    ChannelError(String),
 }
 
 impl Error {

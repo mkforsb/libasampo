@@ -7,6 +7,7 @@ edition = "2021"
 ignored = ["md-5"]
 
 [features]
+audiothread-integration = ["dep:audiothread"]
 fakes = []
 mocks = ["dep:mockall"]
 wav-output-tests = []
@@ -17,6 +18,7 @@ json = "0.12.4"
 mockall = { version = "0.12.1" }
 
 [dependencies]
+audiothread = { workspace = true, optional = true }
 glob = "0.3.1"
 hound = "3.5.1"
 log = "0.4.21"
@@ -24,6 +26,7 @@ md-5 = "0.10.6"
 mockall = { version = "0.12.1", optional = true }
 rayon = "1.10.0"
 rayon-progress = "1.0.0"
+ringbuf = "0.4.1"
 samplerate = "0.2.4"
 serde_json = "1.0.115"
 serde = { version = "1.0.197", features = ["derive"] }

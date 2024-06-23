@@ -10,7 +10,10 @@ mod render;
 mod time;
 
 pub use render::{DrumkitSampleLoader, DrumkitSequenceRenderer, SampleSetSampleLoader};
-pub use time::{NoteLength, Samplerate, TimeSignature, TimeSpec, BPM};
+pub use time::{NoteLength, Samplerate, Swing, TimeSignature, TimeSpec, BPM};
+
+#[cfg(feature = "audiothread-integration")]
+pub mod drumkit_render_thread;
 
 #[derive(Debug, Clone)]
 pub struct Trigger<T: ConcreteSampleSetLabelling> {
