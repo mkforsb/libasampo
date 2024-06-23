@@ -157,7 +157,7 @@ pub fn spawn(
                             "Control channel disconnected unexpectedly"
                         );
 
-                        return;
+                        break;
                     }
                 },
             }
@@ -170,6 +170,7 @@ pub fn spawn(
                         rts.renderer
                             .render(&mut rts.buffer.as_mut_slice()[..num_vacant]);
                     } else {
+                        // TODO: add pausing on the audiothread side?
                         rts.buffer[..num_vacant].fill(0.0f32);
                     }
 
@@ -187,7 +188,7 @@ pub fn spawn(
                                 "Pull response channel disconnected unexpectedly"
                             );
 
-                            return;
+                            break;
                         }
                     }
                 }
@@ -196,7 +197,8 @@ pub fn spawn(
                     let _ = req
                         .response_tx
                         .send(audiothread::PulledSourcePullReply::Disconnect);
-                    return;
+
+                    break;
                 }
 
                 (_, Err(e)) => match e {
@@ -207,7 +209,7 @@ pub fn spawn(
                             "Pull request channel disconnected unexpectedly"
                         );
 
-                        return;
+                        break;
                     }
                 },
             }
@@ -218,12 +220,15 @@ pub fn spawn(
                         log::Level::Warn,
                         "Forcibly shutting down drumkit sequence render thread"
                     );
-                    return;
+
+                    break;
                 }
             }
 
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
+
+        log::log!(log::Level::Debug, "Exit");
     })
 }
 
