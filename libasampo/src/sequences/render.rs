@@ -151,57 +151,99 @@ mod dksrender {
     }
 
     #[derive(Debug, Clone)]
-    struct LoadedSequence {
-        sequence: DrumkitSequence,
+    struct LoadedSequenceInfo {
         step_frames_remain: f64,
         active_sounds: Vec<ActiveSound>,
         mixbuffer_cap: usize,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Clone)]
     pub struct DrumkitSequenceRenderer {
         sequence: DrumkitSequence,
         output_samplerate: Samplerate,
         samples: Vec<HashMap<DrumkitLabel, Vec<f32>>>,
         samples_current_generation: usize,
         sample_loaders: Vec<ThreadedPromise<HashMap<DrumkitLabel, Vec<f32>>>>,
-        current_step: usize,
-        step_frames_remain: f64,
+        current_step: Option<usize>,
+        step_frames_remain: Option<f64>,
         active_sounds: Vec<ActiveSound>,
-        mixbuffer: Vec<f32>,
+        mixbuffer: Option<Vec<f32>>,
+    }
+
+    impl std::fmt::Debug for DrumkitSequenceRenderer {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if f.alternate() {
+                f.write_str(&format!(
+                    "DrumkitSequenceRenderer(\n\
+                        sequence={:#?}\n,\
+                        output_samplerate={:#?},\n\
+                        samples={:#?},\n\
+                        samples_current_generation={:#?},\n\
+                        sample_loaders: {},\n\
+                        current_step={:#?},\n\
+                        step_frames_remain={:#?}\n\
+                        active_sounds={:#?}\n\
+                        mixbuffer: {})",
+                    self.sequence,
+                    self.output_samplerate,
+                    self.samples
+                        .iter()
+                        .map(|hm| hm.keys().collect::<Vec<_>>())
+                        .collect::<Vec<_>>(),
+                    self.samples_current_generation,
+                    self.sample_loaders.len(),
+                    self.current_step,
+                    self.step_frames_remain,
+                    self.active_sounds,
+                    match &self.mixbuffer {
+                        Some(buf) => format!("{} frames", buf.len() / 8),
+                        None => "not initialized".to_string(),
+                    }
+                ))
+            } else {
+                f.write_str(&format!(
+                    "DrumkitSequenceRenderer(\
+                        sequence={:?}, \
+                        output_samplerate={:?}, \
+                        samples={:?}, \
+                        samples_current_generation={:?}, \
+                        sample_loaders: {}, \
+                        current_step={:?}, \
+                        step_frames_remain={:?} \
+                        active_sounds={:?} \
+                        mixbuffer: {})",
+                    self.sequence,
+                    self.output_samplerate,
+                    self.samples
+                        .iter()
+                        .map(|hm| hm.keys().collect::<Vec<_>>())
+                        .collect::<Vec<_>>(),
+                    self.samples_current_generation,
+                    self.sample_loaders.len(),
+                    self.current_step,
+                    self.step_frames_remain,
+                    self.active_sounds,
+                    match &self.mixbuffer {
+                        Some(buf) => format!("{} frames", buf.len() / 8),
+                        None => "not initialized".to_string(),
+                    }
+                ))
+            }
+        }
     }
 
     impl DrumkitSequenceRenderer {
-        pub fn new(
-            seq: DrumkitSequence,
-            output_samplerate: Samplerate,
-            sample_loader: Option<&impl DrumkitSampleLoader>,
-        ) -> Self {
-            let mut samples: HashMap<DrumkitLabel, Vec<f32>> = HashMap::new();
-
-            if let Some(loader) = sample_loader {
-                for label in loader.labels() {
-                    let (metadata, audio_data) = loader.load_sample(&label).unwrap();
-
-                    samples.insert(
-                        label,
-                        to_stereo_with_samplerate(audio_data, metadata, output_samplerate.get()),
-                    );
-                }
-            }
-
-            let loaded_seq = Self::load_sequence(seq, output_samplerate, &samples, 0);
-
+        pub fn new(output_samplerate: Samplerate) -> Self {
             Self {
-                sequence: loaded_seq.sequence,
+                sequence: DrumkitSequence::default(),
                 output_samplerate,
-                samples: vec![samples],
+                samples: vec![HashMap::new()],
                 samples_current_generation: 0,
-                sample_loaders: vec![],
-                current_step: 0,
-                step_frames_remain: loaded_seq.step_frames_remain,
-                active_sounds: loaded_seq.active_sounds,
-                mixbuffer: vec![0.0f32; loaded_seq.mixbuffer_cap],
+                sample_loaders: Vec::new(),
+                current_step: None,
+                step_frames_remain: None,
+                active_sounds: Vec::new(),
+                mixbuffer: None,
             }
         }
 
@@ -217,6 +259,24 @@ mod dksrender {
                     ThreadedPromiseState::Failed => false,
                 });
 
+            if self.current_step.is_none() {
+                let loaded_seq = Self::load_sequence(
+                    &self.sequence,
+                    self.output_samplerate,
+                    &self.samples[self.samples_current_generation],
+                    self.samples_current_generation,
+                );
+
+                self.current_step = Some(0);
+                self.step_frames_remain = Some(loaded_seq.step_frames_remain);
+                self.active_sounds = loaded_seq.active_sounds;
+                self.mixbuffer = Some(vec![0.0f32; loaded_seq.mixbuffer_cap]);
+            }
+
+            let step_frames_remain = self.step_frames_remain.as_mut().unwrap();
+            let current_step = self.current_step.as_mut().unwrap();
+            let mixbuffer = self.mixbuffer.as_mut().unwrap();
+
             // TODO: remove unused sample cache generations
 
             let mut frames_to_write = buffer.len() / 2;
@@ -224,17 +284,17 @@ mod dksrender {
 
             while frames_to_write > 0 {
                 let frames_this_cycle =
-                    std::cmp::min(frames_to_write, self.step_frames_remain as usize);
+                    std::cmp::min(frames_to_write, *step_frames_remain as usize);
 
                 // zero mixbuffer
-                self.mixbuffer[..(frames_this_cycle * 2)].fill(0.0);
+                mixbuffer[..(frames_this_cycle * 2)].fill(0.0);
 
                 // mix active sounds into mixbuffer
                 self.active_sounds.iter_mut().for_each(|s| {
                     let frames =
                         std::cmp::min(frames_this_cycle, s.num_frames - s.offset_in_frames);
 
-                    self.mixbuffer[..(frames * 2)]
+                    mixbuffer[..(frames * 2)]
                         .iter_mut()
                         .zip(
                             self.samples[s.samples_generation]
@@ -257,22 +317,19 @@ mod dksrender {
 
                 // write mixbuffer into output buffer
                 buffer[output_buffer_offset..(output_buffer_offset + (frames_this_cycle * 2))]
-                    .copy_from_slice(&self.mixbuffer[..(frames_this_cycle * 2)]);
+                    .copy_from_slice(&mixbuffer[..(frames_this_cycle * 2)]);
 
                 output_buffer_offset += frames_this_cycle * 2;
 
-                self.step_frames_remain -= frames_this_cycle as f64;
+                *step_frames_remain -= frames_this_cycle as f64;
                 frames_to_write -= frames_this_cycle;
 
-                if self.step_frames_remain < 1.0 {
+                if *step_frames_remain < 1.0 {
                     // fetch next step and add active sounds
-                    self.current_step = (self.current_step + 1) % self.sequence.len();
+                    *current_step = (*current_step + 1) % self.sequence.len();
 
-                    if let Some(step) = self
-                        .sequence
-                        .step(self.current_step, self.output_samplerate)
-                    {
-                        self.step_frames_remain += step.length_in_samples;
+                    if let Some(step) = self.sequence.step(*current_step, self.output_samplerate) {
+                        *step_frames_remain += step.length_in_samples;
 
                         step.triggers
                             .iter()
@@ -299,60 +356,15 @@ mod dksrender {
             buffer.len()
         }
 
-        fn load_sequence(
-            seq: DrumkitSequence,
-            output_samplerate: Samplerate,
-            samples: &HashMap<DrumkitLabel, Vec<f32>>,
-            samples_generation: usize,
-        ) -> LoadedSequence {
-            let step0 = seq.step(0, output_samplerate).unwrap();
-            let step_frames_remain = step0.length_in_samples;
-
-            let active_sounds = step0
-                .triggers
-                .iter()
-                .filter_map(|trigger| {
-                    samples.get(&trigger.label).map(|sampledata| ActiveSound {
-                        label: trigger.label.clone(),
-                        samples_generation,
-                        amplitude: trigger.amplitude,
-                        offset_in_frames: 0,
-                        num_frames: sampledata.len() / 2,
-                    })
-                })
-                .collect();
-
-            let mixbuffer_cap = 4.0
-                * seq
-                    .timespec
-                    .samples_per_note(output_samplerate, seq.step_base_length);
-
-            assert!(
-                mixbuffer_cap <= usize::MAX as f64,
-                "Sequence base step length too long"
-            );
-
-            LoadedSequence {
-                sequence: seq,
-                step_frames_remain,
-                active_sounds,
-                mixbuffer_cap: mixbuffer_cap as usize,
-            }
+        pub fn reset_sequence(&mut self) {
+            self.current_step = None;
+            self.step_frames_remain = None;
+            self.mixbuffer = None;
         }
 
         pub fn set_sequence(&mut self, sequence: DrumkitSequence) {
-            let loaded_seq = Self::load_sequence(
-                sequence,
-                self.output_samplerate,
-                &self.samples[self.samples_current_generation],
-                self.samples_current_generation,
-            );
-
-            self.sequence = loaded_seq.sequence;
-            self.current_step = 0;
-            self.step_frames_remain = loaded_seq.step_frames_remain;
-            self.active_sounds = loaded_seq.active_sounds;
-            self.mixbuffer = vec![0.0f32; loaded_seq.mixbuffer_cap];
+            self.sequence = sequence;
+            self.reset_sequence();
         }
 
         pub fn set_tempo(&mut self, bpm: BPM) {
@@ -385,7 +397,23 @@ mod dksrender {
             self.sequence.unset_step_trigger(n, label);
         }
 
-        pub fn set_samples(&mut self, loader: impl DrumkitSampleLoader + Send + 'static) {
+        pub fn load_samples(&mut self, loader: impl DrumkitSampleLoader) {
+            let mut result = HashMap::<DrumkitLabel, Vec<f32>>::new();
+
+            for label in loader.labels() {
+                let (metadata, audio_data) = loader.load_sample(&label).unwrap();
+
+                result.insert(
+                    label,
+                    to_stereo_with_samplerate(audio_data, metadata, self.output_samplerate.get()),
+                );
+            }
+
+            self.samples.push(result);
+            self.samples_current_generation += 1;
+        }
+
+        pub fn load_samples_async(&mut self, loader: impl DrumkitSampleLoader + Send + 'static) {
             let samplerate = self.output_samplerate.get();
 
             self.sample_loaders
@@ -405,6 +433,46 @@ mod dksrender {
                         result
                     },
                 ));
+        }
+
+        fn load_sequence(
+            seq: &DrumkitSequence,
+            output_samplerate: Samplerate,
+            samples: &HashMap<DrumkitLabel, Vec<f32>>,
+            samples_generation: usize,
+        ) -> LoadedSequenceInfo {
+            let step0 = seq.step(0, output_samplerate).unwrap();
+            let step_frames_remain = step0.length_in_samples;
+
+            let active_sounds = step0
+                .triggers
+                .iter()
+                .filter_map(|trigger| {
+                    samples.get(&trigger.label).map(|sampledata| ActiveSound {
+                        label: trigger.label.clone(),
+                        samples_generation,
+                        amplitude: trigger.amplitude,
+                        offset_in_frames: 0,
+                        num_frames: sampledata.len() / 2,
+                    })
+                })
+                .collect();
+
+            let mixbuffer_cap = 4.0
+                * seq
+                    .timespec
+                    .samples_per_note(output_samplerate, seq.step_base_length);
+
+            assert!(
+                mixbuffer_cap <= usize::MAX as f64,
+                "Sequence base step length too long"
+            );
+
+            LoadedSequenceInfo {
+                step_frames_remain,
+                active_sounds,
+                mixbuffer_cap: mixbuffer_cap as usize,
+            }
         }
     }
 }
@@ -485,6 +553,17 @@ mod tests {
         seq
     }
 
+    fn renderer(
+        samplerate: u32,
+        samples: impl DrumkitSampleLoader,
+        sequence: DrumkitSequence,
+    ) -> DrumkitSequenceRenderer {
+        let mut renderer = DrumkitSequenceRenderer::new(samplerate.try_into().unwrap());
+        renderer.load_samples(samples);
+        renderer.set_sequence(sequence);
+        renderer
+    }
+
     fn write_wav_f32(path: &str, bufs: &Vec<Vec<f32>>, sample_rate: u32) {
         let mut writer = hound::WavWriter::create(
             path,
@@ -509,12 +588,7 @@ mod tests {
     #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat() {
-        let mut renderer = DrumkitSequenceRenderer::new(
-            basic_beat(),
-            44100.try_into().unwrap(),
-            Some(&drumkit_loader()),
-        );
-
+        let mut renderer = renderer(44100, drumkit_loader(), basic_beat());
         let mut resultbuf = vec![0.0f32; 2 * 4 * 44100];
 
         assert_eq!(renderer.render(resultbuf.as_mut_slice()), resultbuf.len());
@@ -529,11 +603,7 @@ mod tests {
     #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat_bpm_swing_changes() {
-        let mut renderer = DrumkitSequenceRenderer::new(
-            basic_beat(),
-            44100.try_into().unwrap(),
-            Some(&drumkit_loader()),
-        );
+        let mut renderer = renderer(44100, drumkit_loader(), basic_beat());
 
         let mut buf1 = vec![0.0f32; 2 * 44100];
         let mut buf2 = vec![0.0f32; 2 * 44100];
@@ -566,11 +636,7 @@ mod tests {
     #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat_step_changes() {
-        let mut renderer = DrumkitSequenceRenderer::new(
-            basic_beat(),
-            44100.try_into().unwrap(),
-            Some(&drumkit_loader()),
-        );
+        let mut renderer = renderer(44100, drumkit_loader(), basic_beat());
 
         let mut buf1 = vec![0.0f32; 2 * 2 * 44100];
         let mut buf2 = vec![0.0f32; 2 * 2 * 44100];
@@ -604,11 +670,7 @@ mod tests {
     #[cfg_attr(not(feature = "wav-output-tests"), ignore)]
     #[test]
     fn test_wav_basic_beat_sample_swap() {
-        let mut renderer = DrumkitSequenceRenderer::new(
-            basic_beat(),
-            44100.try_into().unwrap(),
-            Some(&drumkit_loader()),
-        );
+        let mut renderer = renderer(44100, drumkit_loader(), basic_beat());
 
         let mut buf1 = vec![0.0f32; 2 * 2 * 44100];
         let mut buf2 = vec![0.0f32; 2 * 2 * 44100];
@@ -645,7 +707,7 @@ mod tests {
 
         assert_eq!(renderer.render(buf1.as_mut_slice()), buf1.len());
 
-        renderer.set_samples(SampleSetSampleLoader {
+        renderer.load_samples_async(SampleSetSampleLoader {
             sample_set: set,
             sources: vec![source],
         });

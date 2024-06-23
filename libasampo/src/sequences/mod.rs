@@ -65,6 +65,16 @@ impl DrumkitSequence {
     }
 }
 
+impl Default for DrumkitSequence {
+    fn default() -> Self {
+        DrumkitSequence {
+            timespec: TimeSpec::new(120, 4, 4).unwrap(),
+            step_base_length: NoteLength::Sixteenth,
+            steps: vec![Vec::new(); 16],
+        }
+    }
+}
+
 impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
     fn timespec(&self) -> TimeSpec {
         self.timespec
