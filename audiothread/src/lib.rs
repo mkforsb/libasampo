@@ -155,7 +155,7 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
 
     assert!(pulse_spec.is_valid());
 
-    log::log!(log::Level::Info, "Audiothread starting up");
+    log::log!(log::Level::Info, "Audiothread starting up ({pulse_spec:?})");
 
     let mut pa_mainloop =
         PulseMainloop::new().expect("Libpulse should be able to allocate a mainloop");
