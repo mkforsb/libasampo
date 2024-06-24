@@ -2,6 +2,14 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
+use std::collections::HashMap;
+
+use crate::{
+    prelude::SampleOps,
+    samples::{BaseSample, Sample, SampleMetadata, SampleURI},
+    sources::{FakeSource, Source},
+};
+
 pub(crate) fn s<T: Into<String>>(s: T) -> String {
     s.into()
 }
@@ -24,9 +32,7 @@ pub(crate) mod audiohash_for_test {
     }
 }
 
-pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample {
-    use core::panic;
-
+pub(crate) fn sample_from_json(json: &json::JsonValue) -> Sample {
     let uri = match &json["uri"] {
         json::JsonValue::Short(s) => s.to_string(),
         json::JsonValue::String(s) => s.to_string(),
@@ -79,10 +85,10 @@ pub(crate) fn sample_from_json(json: &json::JsonValue) -> crate::samples::Sample
         _ => panic!("sample_from_json: invalid value for `length_millis` (valid: Number)"),
     };
 
-    crate::samples::Sample::BaseSample(crate::samples::BaseSample::new(
+    Sample::BaseSample(BaseSample::new(
         SampleURI::new(uri),
         name,
-        crate::samples::SampleMetadata {
+        SampleMetadata {
             rate,
             channels,
             src_fmt_display,
@@ -113,11 +119,7 @@ macro_rules! sample {
 
 pub(crate) use sample;
 
-pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::Source {
-    use std::collections::HashMap;
-
-    use crate::prelude::SampleOps;
-
+pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> Source {
     let name = match &json["name"] {
         json::JsonValue::Boolean(b) => match b {
             true => {
@@ -215,7 +217,7 @@ pub(crate) fn fakesource_from_json(json: &json::JsonValue) -> crate::sources::So
         _ => panic!("fakesource_from_json: invalid value for `enabled` (valid: bool)"),
     };
 
-    crate::sources::Source::FakeSource(crate::sources::FakeSource {
+    Source::FakeSource(FakeSource {
         name,
         uri,
         uuid,
@@ -247,7 +249,93 @@ macro_rules! fakesource {
 
 pub(crate) use fakesource;
 
-use crate::samples::SampleURI;
+// pub(crate) fn fake_sampleset(name: impl Into<String>, source: Source) -> (SampleSet, Source) {
+//     assert!(if let Source::FakeSource(_) = source {
+//         true
+//     } else {
+//         false
+//     });
+//
+//     let mut set = BaseSampleSet::new(name.into());
+//
+//     for sample in source.list().unwrap().into_iter() {
+//         set.add_with_hash(sample, "hash".to_string());
+//     }
+//
+//     (SampleSet::BaseSampleSet(set), source)
+// }
+//
+// pub(crate) fn fake_sampleset_drumkit(
+//     name: impl Into<String>,
+//     source: Source,
+//     f: impl Fn(&SampleURI) -> DrumkitLabel,
+// ) -> (SampleSet, Source) {
+//     let (mut set, source) = fake_sampleset(name, source);
+//
+//     let mut labelling = DrumkitLabelling::new();
+//
+//     match &set {
+//         SampleSet::BaseSampleSet(set) => {
+//             for sample in set.list() {
+//                 labelling.set(sample.uri().clone(), f(sample.uri()));
+//             }
+//         }
+//
+//         #[allow(unreachable_patterns)]
+//         _ => unimplemented!(),
+//     };
+//
+//     set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(labelling)));
+//
+//     (set, source)
+// }
+//
+// pub(crate) struct FakeSampleLoader {
+//     pub(crate) set: SampleSet,
+//     pub(crate) source: Source,
+// }
+//
+// impl DrumkitSampleLoader for FakeSampleLoader {
+//     fn load_sample(&self, label_to_load: &DrumkitLabel) -> Option<(SampleMetadata, Vec<f32>)> {
+//         match self.set.labelling() {
+//             Some(SampleSetLabelling::DrumkitLabelling(labelling)) if !labelling.is_empty() => self
+//                 .set
+//                 .list()
+//                 .iter()
+//                 .find(|sample| {
+//                     labelling
+//                         .get(sample.uri())
+//                         .is_some_and(|sample_label| sample_label == label_to_load)
+//                 })
+//                 .and_then(|sample| {
+//                     let mut data = Vec::<f32>::new();
+//                     let mut stream = self.source.stream(sample).unwrap();
+//
+//                     loop {
+//                         match stream.read_f32::<NativeEndian>() {
+//                             Ok(val) => data.push(val),
+//                             Err(_) => break,
+//                         }
+//                     }
+//
+//                     Some((sample.metadata().clone(), data))
+//                 }),
+//             Some(SampleSetLabelling::DrumkitLabelling(_)) | None => None,
+//         }
+//     }
+//
+//     fn labels(&self) -> Vec<DrumkitLabel> {
+//         match self.set.labelling() {
+//             Some(SampleSetLabelling::DrumkitLabelling(labelling)) if !labelling.is_empty() => self
+//                 .set
+//                 .list()
+//                 .iter()
+//                 .filter_map(|s| labelling.get(s.uri()).cloned())
+//                 .collect(),
+//             Some(SampleSetLabelling::DrumkitLabelling(_)) | None => vec![],
+//         }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
