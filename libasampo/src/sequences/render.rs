@@ -256,7 +256,7 @@ mod dksrender {
             }
         }
 
-        pub fn render(&mut self, buffer: &mut [f32]) -> usize {
+        fn check_sample_loaders(&mut self) {
             self.sample_loaders
                 .retain_mut(|loader| match loader.poll() {
                     ThreadedPromiseState::Pending => true,
@@ -267,19 +267,27 @@ mod dksrender {
                     }
                     ThreadedPromiseState::Failed => false,
                 });
+        }
+
+        fn init_sequence(&mut self) {
+            let loaded_seq = Self::load_sequence(
+                &self.sequence,
+                self.output_samplerate,
+                &self.samples[self.samples_current_generation],
+                self.samples_current_generation,
+            );
+
+            self.current_step = Some(0);
+            self.step_frames_remain = Some(loaded_seq.step_frames_remain);
+            self.active_sounds = loaded_seq.active_sounds;
+            self.mixbuffer = Some(vec![0.0f32; loaded_seq.mixbuffer_cap]);
+        }
+
+        pub fn render(&mut self, buffer: &mut [f32]) -> usize {
+            self.check_sample_loaders();
 
             if self.current_step.is_none() {
-                let loaded_seq = Self::load_sequence(
-                    &self.sequence,
-                    self.output_samplerate,
-                    &self.samples[self.samples_current_generation],
-                    self.samples_current_generation,
-                );
-
-                self.current_step = Some(0);
-                self.step_frames_remain = Some(loaded_seq.step_frames_remain);
-                self.active_sounds = loaded_seq.active_sounds;
-                self.mixbuffer = Some(vec![0.0f32; loaded_seq.mixbuffer_cap]);
+                self.init_sequence();
             }
 
             let step_frames_remain = self.step_frames_remain.as_mut().unwrap();
