@@ -80,6 +80,7 @@ impl DrumkitSampleLoader for SampleSetSampleLoader {
 
 mod dksrender {
     use std::{
+        collections::HashSet,
         rc::Rc,
         sync::mpsc::{channel, Receiver, TryRecvError},
     };
@@ -479,7 +480,24 @@ mod dksrender {
             self.mixbuffer = Some(vec![0.0f32; loaded_seq.mixbuffer_cap]);
         }
 
+        fn unload_stale_samples(&mut self) {
+            let active_generations = self
+                .active_sounds
+                .iter()
+                .map(|x| x.samples_generation)
+                .collect::<HashSet<_>>();
+
+            for (index, cache) in self.samples.iter_mut().enumerate() {
+                if index < self.samples_current_generation && !active_generations.contains(&index) {
+                    log::log!(log::Level::Debug, "Unloading samples generation {index}");
+                    cache.clear();
+                }
+            }
+        }
+
         fn check_sample_loaders(&mut self) {
+            let generation_pre = self.samples_current_generation;
+
             self.sample_loaders
                 .retain_mut(|loader| match loader.poll() {
                     ThreadedPromiseState::Pending => true,
@@ -490,6 +508,85 @@ mod dksrender {
                     }
                     ThreadedPromiseState::Failed => false,
                 });
+
+            if self.samples_current_generation > generation_pre {
+                self.unload_stale_samples();
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_unload_stale_samples() {
+            fn load_samples(dksr: &mut DrumkitSequenceRenderer) {
+                dksr.samples.push(
+                    vec![(DrumkitLabel::BassDrum, vec![])]
+                        .into_iter()
+                        .collect::<HashMap<_, _>>(),
+                );
+
+                dksr.samples_current_generation += 1;
+            }
+
+            let mut dksr = DrumkitSequenceRenderer::new(44100.try_into().unwrap());
+
+            load_samples(&mut dksr);
+            assert_eq!(dksr.samples[1].len(), 1);
+
+            dksr.active_sounds.push(ActiveSound {
+                label: DrumkitLabel::BassDrum,
+                samples_generation: dksr.samples_current_generation,
+                amplitude: 1.0,
+                offset_in_frames: 0,
+                num_frames: 1,
+            });
+
+            load_samples(&mut dksr);
+            dksr.unload_stale_samples();
+            assert_eq!(dksr.samples[1].len(), 1);
+
+            dksr.active_sounds.clear();
+            dksr.unload_stale_samples();
+            assert_eq!(dksr.samples[1].len(), 0);
+        }
+
+        #[test]
+        fn test_unload_stale_samples_async() {
+            fn load_samples(dksr: &mut DrumkitSequenceRenderer) {
+                dksr.sample_loaders.push(ThreadedPromise::new(|| {
+                    vec![(DrumkitLabel::BassDrum, vec![])]
+                        .into_iter()
+                        .collect::<HashMap<_, _>>()
+                }));
+
+                while !dksr.sample_loaders.is_empty() {
+                    dksr.check_sample_loaders();
+                }
+            }
+
+            let mut dksr = DrumkitSequenceRenderer::new(44100.try_into().unwrap());
+
+            load_samples(&mut dksr);
+            assert_eq!(dksr.samples[1].len(), 1);
+
+            dksr.active_sounds.push(ActiveSound {
+                label: DrumkitLabel::BassDrum,
+                samples_generation: dksr.samples_current_generation,
+                amplitude: 1.0,
+                offset_in_frames: 0,
+                num_frames: 1,
+            });
+
+            load_samples(&mut dksr);
+            dksr.unload_stale_samples();
+            assert_eq!(dksr.samples[1].len(), 1);
+
+            dksr.active_sounds.clear();
+            dksr.unload_stale_samples();
+            assert_eq!(dksr.samples[1].len(), 0);
         }
     }
 }
