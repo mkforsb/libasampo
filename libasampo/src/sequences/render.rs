@@ -520,6 +520,28 @@ mod dksrender {
         use super::*;
 
         #[test]
+        fn test_load_and_init_sequence() {
+            let mut dksr = DrumkitSequenceRenderer::new(44100.try_into().unwrap());
+
+            assert!(dksr.step_frames_remain.is_none());
+            assert!(dksr.current_step.is_none());
+            assert!(dksr.mixbuffer.is_none());
+
+            let info = DrumkitSequenceRenderer::load_sequence(
+                &dksr.sequence,
+                dksr.output_samplerate,
+                dksr.samples.last().unwrap(),
+                dksr.samples_current_generation,
+            );
+
+            dksr.init_sequence();
+
+            assert_eq!(dksr.step_frames_remain, Some(info.step_frames_remain));
+            assert_eq!(dksr.current_step, Some(0));
+            assert_eq!(dksr.mixbuffer.unwrap().len(), info.mixbuffer_cap);
+        }
+
+        #[test]
         fn test_unload_stale_samples() {
             fn load_samples(dksr: &mut DrumkitSequenceRenderer) {
                 dksr.samples.push(
