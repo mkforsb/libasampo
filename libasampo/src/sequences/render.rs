@@ -686,27 +686,20 @@ mod tests {
 
         let (source, mut set) = drumkit();
 
-        let bd_uri = set
-            .list()
-            .iter()
-            .find(|s| s.name() == "kick.wav")
-            .unwrap()
-            .uri()
-            .clone();
-        let ch_uri = set
-            .list()
-            .iter()
-            .find(|s| s.name() == "hihat.wav")
-            .unwrap()
-            .uri()
-            .clone();
-        let sd_uri = set
-            .list()
-            .iter()
-            .find(|s| s.name() == "snare.wav")
-            .unwrap()
-            .uri()
-            .clone();
+        macro_rules! uri {
+            ($set:ident, $name:expr) => {
+                $set.list()
+                    .iter()
+                    .find(|s| s.name() == $name)
+                    .unwrap()
+                    .uri()
+                    .clone()
+            };
+        }
+
+        let bd_uri = uri!(set, "kick.wav");
+        let ch_uri = uri!(set, "hihat.wav");
+        let sd_uri = uri!(set, "snare.wav");
 
         if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
             labels.set(bd_uri, DrumkitLabel::Snare);
