@@ -66,14 +66,22 @@ impl State {
             .recv_timeout(std::time::Duration::from_secs(1))
             .map_err(|e| Error::ChannelError(e.to_string()))?;
 
+        log::log!(log::Level::Debug, "Output spec: {:?}", output_spec);
+
         let renderer = DrumkitSequenceRenderer::new(output_spec.samplerate.get().try_into()?);
 
         let (pull_request_tx, pull_request_rx) = channel::<audiothread::PulledSourcePullRequest>();
 
-        let buffer = vec![0.0f32; output_spec.samplerate.get() as usize];
+        let bufsize = ((output_spec.samplerate.get() as usize) / 8) * 2;
+        let buffer = vec![0.0f32; bufsize];
 
-        let (buffer_tx, buffer_rx) =
-            HeapRb::<f32>::new(output_spec.samplerate.get() as usize).split();
+        log::log!(
+            log::Level::Debug,
+            "Drum render buffer size (frames): {}",
+            buffer.len() / 2
+        );
+
+        let (buffer_tx, buffer_rx) = HeapRb::<f32>::new(bufsize).split();
 
         audiothread_tx
             .send(audiothread::Message::CreatePulledSource(
