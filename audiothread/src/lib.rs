@@ -164,7 +164,7 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
         .expect("Libpulse should be able to alloate a context");
 
     let pa_context_raw: *mut PulseContext = &mut pa_context;
-    let pa_context_csc = pa_context_raw.clone();
+    let pa_context_csc = pa_context_raw;
 
     let sourcegroups: Rc<RefCell<HashMap<AudioSpec, SourceGroup>>> =
         Rc::new(RefCell::new(HashMap::new()));
@@ -212,8 +212,8 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
         PulseStream::new(&mut pa_context, "My Stream", &pulse_spec, None).expect("stream");
 
     let stream_raw: *mut PulseStream = &mut stream;
-    let stream_ssc = stream_raw.clone();
-    let stream_srw = stream_raw.clone();
+    let stream_ssc = stream_raw;
+    let stream_srw = stream_raw;
 
     let stream_state_changed = move || {
         log::log!(log::Level::Debug, "Stream state changed: {:?}", unsafe {
