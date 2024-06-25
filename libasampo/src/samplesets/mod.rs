@@ -20,7 +20,7 @@ use crate::testutils::audiohash_for_test::audio_hash;
 
 pub mod export;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DrumkitLabel {
     RimShot,
     Clap,
