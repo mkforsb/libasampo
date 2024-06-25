@@ -13,18 +13,23 @@ use crate::{
     serialize::{TryFromDomain, TryIntoDomain},
 };
 
-const DRUMKIT_LABELS: [(&str, crate::samplesets::DrumkitLabel); 11] = [
-    ("BassDrum", crate::samplesets::DrumkitLabel::BassDrum),
-    ("Rimshot", crate::samplesets::DrumkitLabel::Rimshot),
-    ("Snare", crate::samplesets::DrumkitLabel::Snare),
+const DRUMKIT_LABELS: [(&str, crate::samplesets::DrumkitLabel); 16] = [
+    ("RimShot", crate::samplesets::DrumkitLabel::RimShot),
     ("Clap", crate::samplesets::DrumkitLabel::Clap),
     ("ClosedHihat", crate::samplesets::DrumkitLabel::ClosedHihat),
     ("OpenHihat", crate::samplesets::DrumkitLabel::OpenHihat),
     ("CrashCymbal", crate::samplesets::DrumkitLabel::CrashCymbal),
     ("RideCymbal", crate::samplesets::DrumkitLabel::RideCymbal),
-    ("Tom1", crate::samplesets::DrumkitLabel::Tom1),
-    ("Tom2", crate::samplesets::DrumkitLabel::Tom2),
-    ("Tom3", crate::samplesets::DrumkitLabel::Tom3),
+    ("Shaker", crate::samplesets::DrumkitLabel::Shaker),
+    ("BassDrum", crate::samplesets::DrumkitLabel::BassDrum),
+    ("SnareDrum", crate::samplesets::DrumkitLabel::SnareDrum),
+    ("LowTom", crate::samplesets::DrumkitLabel::LowTom),
+    ("MidTom", crate::samplesets::DrumkitLabel::MidTom),
+    ("HighTom", crate::samplesets::DrumkitLabel::HighTom),
+    ("Perc1", crate::samplesets::DrumkitLabel::Perc1),
+    ("Perc2", crate::samplesets::DrumkitLabel::Perc2),
+    ("Perc3", crate::samplesets::DrumkitLabel::Perc3),
+    ("Perc4", crate::samplesets::DrumkitLabel::Perc4),
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

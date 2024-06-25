@@ -22,17 +22,22 @@ pub mod export;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DrumkitLabel {
-    BassDrum,
-    Rimshot,
-    Snare,
+    RimShot,
     Clap,
     ClosedHihat,
     OpenHihat,
     CrashCymbal,
     RideCymbal,
-    Tom1,
-    Tom2,
-    Tom3,
+    Shaker,
+    BassDrum,
+    SnareDrum,
+    LowTom,
+    MidTom,
+    HighTom,
+    Perc1,
+    Perc2,
+    Perc3,
+    Perc4,
 }
 
 pub trait ConcreteSampleSetLabelling {

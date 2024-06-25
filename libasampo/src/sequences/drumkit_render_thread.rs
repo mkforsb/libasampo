@@ -280,7 +280,7 @@ mod tests {
 
         labels.set(bd.uri().clone(), DrumkitLabel::BassDrum);
         labels.set(ch.uri().clone(), DrumkitLabel::ClosedHihat);
-        labels.set(sd.uri().clone(), DrumkitLabel::Snare);
+        labels.set(sd.uri().clone(), DrumkitLabel::SnareDrum);
 
         set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(labels)));
 
@@ -308,8 +308,8 @@ mod tests {
             seq.set_step_trigger(i, DrumkitLabel::ClosedHihat, 0.5);
         }
 
-        seq.set_step_trigger(4, DrumkitLabel::Snare, 0.5);
-        seq.set_step_trigger(12, DrumkitLabel::Snare, 0.5);
+        seq.set_step_trigger(4, DrumkitLabel::SnareDrum, 0.5);
+        seq.set_step_trigger(12, DrumkitLabel::SnareDrum, 0.5);
 
         seq
     }

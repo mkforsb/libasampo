@@ -212,12 +212,12 @@ mod tests {
         seq.set_step_trigger(0, DrumkitLabel::BassDrum, 1.0);
 
         seq.set_step_trigger(4, DrumkitLabel::BassDrum, 1.0);
-        seq.set_step_trigger(4, DrumkitLabel::Snare, 1.0);
+        seq.set_step_trigger(4, DrumkitLabel::SnareDrum, 1.0);
 
         seq.set_step_trigger(8, DrumkitLabel::BassDrum, 1.0);
 
         seq.set_step_trigger(12, DrumkitLabel::BassDrum, 1.0);
-        seq.set_step_trigger(12, DrumkitLabel::Snare, 1.0);
+        seq.set_step_trigger(12, DrumkitLabel::SnareDrum, 1.0);
 
         seq
     }
@@ -284,7 +284,7 @@ mod tests {
         seq.unset_step_trigger(12, DrumkitLabel::BassDrum);
         assert_eq!(steps_with_triggers(0..100, &seq), vec![0, 4, 8, 12]);
 
-        seq.unset_step_trigger(12, DrumkitLabel::Snare);
+        seq.unset_step_trigger(12, DrumkitLabel::SnareDrum);
         assert_eq!(steps_with_triggers(0..100, &seq), vec![0, 4, 8]);
     }
 

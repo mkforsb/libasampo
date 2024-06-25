@@ -652,7 +652,7 @@ mod tests {
 
         labels.set(bd.uri().clone(), DrumkitLabel::BassDrum);
         labels.set(ch.uri().clone(), DrumkitLabel::ClosedHihat);
-        labels.set(sd.uri().clone(), DrumkitLabel::Snare);
+        labels.set(sd.uri().clone(), DrumkitLabel::SnareDrum);
 
         set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(labels)));
 
@@ -683,8 +683,8 @@ mod tests {
             seq.set_step_trigger(i, DrumkitLabel::ClosedHihat, 0.5);
         }
 
-        seq.set_step_trigger(4, DrumkitLabel::Snare, 0.5);
-        seq.set_step_trigger(12, DrumkitLabel::Snare, 0.5);
+        seq.set_step_trigger(4, DrumkitLabel::SnareDrum, 0.5);
+        seq.set_step_trigger(12, DrumkitLabel::SnareDrum, 0.5);
 
         seq
     }
@@ -782,7 +782,7 @@ mod tests {
         assert_eq!(renderer.render(buf1.as_mut_slice()), buf1.len());
 
         renderer.sequence_set_step_trigger(2, DrumkitLabel::BassDrum, 0.5);
-        renderer.sequence_set_step_trigger(5, DrumkitLabel::Snare, 0.5);
+        renderer.sequence_set_step_trigger(5, DrumkitLabel::SnareDrum, 0.5);
         assert_eq!(renderer.render(buf2.as_mut_slice()), buf2.len());
 
         renderer.sequence_unset_step_trigger(0, DrumkitLabel::BassDrum);
@@ -829,7 +829,7 @@ mod tests {
         let sd_uri = uri!(set, "snare.wav");
 
         if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
-            labels.set(bd_uri, DrumkitLabel::Snare);
+            labels.set(bd_uri, DrumkitLabel::SnareDrum);
             labels.set(ch_uri, DrumkitLabel::BassDrum);
             labels.set(sd_uri, DrumkitLabel::ClosedHihat);
         }
