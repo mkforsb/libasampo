@@ -4,7 +4,10 @@
 
 use std::cmp::Ordering;
 
-use crate::{prelude::ConcreteSampleSetLabelling, samplesets::DrumkitLabelling};
+use crate::{
+    prelude::ConcreteSampleSetLabelling,
+    samplesets::{DrumkitLabel, DrumkitLabelling},
+};
 
 mod render;
 mod time;
@@ -67,6 +70,16 @@ impl DrumkitSequence {
             step_base_length,
             steps,
         }
+    }
+
+    pub fn labels_at_step(&self, n: usize) -> Option<Vec<DrumkitLabel>> {
+        Some(
+            self.steps
+                .get(n)?
+                .iter()
+                .map(|t| t.label)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
