@@ -83,6 +83,7 @@ mod dksrender {
         collections::HashSet,
         rc::Rc,
         sync::mpsc::{channel, Receiver, TryRecvError},
+        time::{Duration, Instant},
     };
 
     use crate::sequences::{time::Swing, TimeSpec, BPM};
@@ -149,6 +150,13 @@ mod dksrender {
             None,
         )
         .unwrap()
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct DrumkitSequenceEvent {
+        pub labels: Vec<DrumkitLabel>,
+        pub step: usize,
+        pub time: Instant,
     }
 
     #[derive(Debug, Clone)]
@@ -257,11 +265,25 @@ mod dksrender {
             }
         }
 
-        pub fn render(&mut self, buffer: &mut [f32]) -> usize {
+        pub fn render(&mut self, buffer: &mut [f32]) -> (usize, Option<Vec<DrumkitSequenceEvent>>) {
+            let render_start = Instant::now();
+            let duration_per_frame =
+                Duration::from_secs_f64(1.0f64 / self.output_samplerate.get() as f64);
+            let mut events: Vec<DrumkitSequenceEvent> = Vec::new();
+
             self.check_sample_loaders();
 
             if self.current_step.is_none() {
                 self.init_sequence();
+                events.push(DrumkitSequenceEvent {
+                    labels: self
+                        .active_sounds
+                        .iter()
+                        .map(|s| s.label)
+                        .collect::<Vec<_>>(),
+                    step: 0,
+                    time: render_start,
+                });
             }
 
             let step_frames_remain = self.step_frames_remain.as_mut().unwrap();
@@ -272,6 +294,7 @@ mod dksrender {
 
             let mut frames_to_write = buffer.len() / 2;
             let mut output_buffer_offset = 0;
+            let mut frames_written = 0;
 
             while frames_to_write > 0 {
                 let frames_this_cycle =
@@ -310,6 +333,7 @@ mod dksrender {
                 buffer[output_buffer_offset..(output_buffer_offset + (frames_this_cycle * 2))]
                     .copy_from_slice(&mixbuffer[..(frames_this_cycle * 2)]);
 
+                frames_written += frames_this_cycle;
                 output_buffer_offset += frames_this_cycle * 2;
 
                 *step_frames_remain -= frames_this_cycle as f64;
@@ -329,7 +353,7 @@ mod dksrender {
                             })
                             .for_each(|t| {
                                 self.active_sounds.push(ActiveSound {
-                                    label: t.label.clone(),
+                                    label: t.label,
                                     samples_generation: self.samples_current_generation,
                                     amplitude: t.amplitude,
                                     offset_in_frames: 0,
@@ -341,10 +365,28 @@ mod dksrender {
                                 })
                             });
                     }
+
+                    events.push(DrumkitSequenceEvent {
+                        labels: self
+                            .active_sounds
+                            .iter()
+                            .map(|s| s.label)
+                            .collect::<Vec<_>>(),
+                        step: *current_step,
+                        time: render_start
+                            + duration_per_frame.saturating_mul(frames_written as u32),
+                    });
                 }
             }
 
-            buffer.len()
+            (
+                buffer.len(),
+                if events.is_empty() {
+                    None
+                } else {
+                    Some(events)
+                },
+            )
         }
 
         pub fn reset_sequence(&mut self) {
@@ -426,6 +468,14 @@ mod dksrender {
                 ));
         }
 
+        pub fn borrow_sequence(&self) -> &DrumkitSequence {
+            &self.sequence
+        }
+
+        pub fn output_samplerate(&self) -> Samplerate {
+            self.output_samplerate
+        }
+
         fn load_sequence(
             seq: &DrumkitSequence,
             output_samplerate: Samplerate,
@@ -440,7 +490,7 @@ mod dksrender {
                 .iter()
                 .filter_map(|trigger| {
                     samples.get(&trigger.label).map(|sampledata| ActiveSound {
-                        label: trigger.label.clone(),
+                        label: trigger.label,
                         samples_generation,
                         amplitude: trigger.amplitude,
                         offset_in_frames: 0,
@@ -613,7 +663,7 @@ mod dksrender {
     }
 }
 
-pub use dksrender::DrumkitSequenceRenderer;
+pub use dksrender::{DrumkitSequenceEvent, DrumkitSequenceRenderer};
 
 #[cfg(test)]
 mod tests {
@@ -727,7 +777,7 @@ mod tests {
         let mut renderer = renderer(44100, drumkit_loader(), basic_beat());
         let mut resultbuf = vec![0.0f32; 2 * 4 * 44100];
 
-        assert_eq!(renderer.render(resultbuf.as_mut_slice()), resultbuf.len());
+        assert_eq!(renderer.render(resultbuf.as_mut_slice()).0, resultbuf.len());
 
         write_wav_f32(
             &format!("{}/basic_beat.wav", env::var("CARGO_MANIFEST_DIR").unwrap()),
@@ -746,18 +796,18 @@ mod tests {
         let mut buf3 = vec![0.0f32; 2 * 44100];
         let mut buf4 = vec![0.0f32; 2 * 44100];
 
-        assert_eq!(renderer.render(buf1.as_mut_slice()), buf1.len());
+        assert_eq!(renderer.render(buf1.as_mut_slice()).0, buf1.len());
 
         renderer.set_tempo(BPM::new(130).unwrap());
         renderer.set_swing(Swing::new(0.33).unwrap());
-        assert_eq!(renderer.render(buf2.as_mut_slice()), buf2.len());
+        assert_eq!(renderer.render(buf2.as_mut_slice()).0, buf2.len());
 
         renderer.set_tempo(BPM::new(160).unwrap());
         renderer.set_swing(Swing::new(0.0).unwrap());
-        assert_eq!(renderer.render(buf3.as_mut_slice()), buf3.len());
+        assert_eq!(renderer.render(buf3.as_mut_slice()).0, buf3.len());
 
         renderer.set_tempo(BPM::new(60).unwrap());
-        assert_eq!(renderer.render(buf4.as_mut_slice()), buf4.len());
+        assert_eq!(renderer.render(buf4.as_mut_slice()).0, buf4.len());
 
         write_wav_f32(
             &format!(
@@ -779,19 +829,19 @@ mod tests {
         let mut buf3 = vec![0.0f32; 2 * 2 * 44100];
         let mut buf4 = vec![0.0f32; 2 * 2 * 44100];
 
-        assert_eq!(renderer.render(buf1.as_mut_slice()), buf1.len());
+        assert_eq!(renderer.render(buf1.as_mut_slice()).0, buf1.len());
 
         renderer.sequence_set_step_trigger(2, DrumkitLabel::BassDrum, 0.5);
         renderer.sequence_set_step_trigger(5, DrumkitLabel::SnareDrum, 0.5);
-        assert_eq!(renderer.render(buf2.as_mut_slice()), buf2.len());
+        assert_eq!(renderer.render(buf2.as_mut_slice()).0, buf2.len());
 
         renderer.sequence_unset_step_trigger(0, DrumkitLabel::BassDrum);
         renderer.sequence_unset_step_trigger(4, DrumkitLabel::BassDrum);
         renderer.sequence_unset_step_trigger(8, DrumkitLabel::BassDrum);
-        assert_eq!(renderer.render(buf3.as_mut_slice()), buf3.len());
+        assert_eq!(renderer.render(buf3.as_mut_slice()).0, buf3.len());
 
         renderer.sequence_clear();
-        assert_eq!(renderer.render(buf4.as_mut_slice()), buf4.len());
+        assert_eq!(renderer.render(buf4.as_mut_slice()).0, buf4.len());
 
         write_wav_f32(
             &format!(
@@ -834,7 +884,7 @@ mod tests {
             labels.set(sd_uri, DrumkitLabel::ClosedHihat);
         }
 
-        assert_eq!(renderer.render(buf1.as_mut_slice()), buf1.len());
+        assert_eq!(renderer.render(buf1.as_mut_slice()).0, buf1.len());
 
         renderer.load_samples_async(SampleSetSampleLoader {
             sample_set: set,
@@ -843,7 +893,7 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        assert_eq!(renderer.render(buf2.as_mut_slice()), buf2.len());
+        assert_eq!(renderer.render(buf2.as_mut_slice()).0, buf2.len());
 
         write_wav_f32(
             &format!(

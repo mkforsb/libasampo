@@ -86,7 +86,7 @@ impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
                         DRUMKIT_LABELS
                             .iter()
                             .find(|(s, _val)| s == label)
-                            .map(|(_s, val)| val.clone())
+                            .map(|(_s, val)| *val)
                             .ok_or(Error::DeserializationError(
                                 "Unknown drumkit label".to_string(),
                             ))?,

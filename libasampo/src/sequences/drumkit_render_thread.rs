@@ -4,7 +4,11 @@
 
 #![cfg(feature = "audiothread-integration")]
 
-use std::sync::mpsc::{channel, Receiver, SendError, Sender};
+use std::{
+    collections::VecDeque,
+    sync::mpsc::{channel, Receiver, SendError, Sender},
+    time::Instant,
+};
 
 use ringbuf::{
     traits::{Observer, Producer, Split},
@@ -14,7 +18,10 @@ use ringbuf::{
 use crate::{
     errors::Error,
     samplesets::DrumkitLabel,
-    sequences::{DrumkitSequence, DrumkitSequenceRenderer, SampleSetSampleLoader, Swing, BPM},
+    sequences::{
+        DrumkitSequence, DrumkitSequenceEvent, DrumkitSequenceRenderer, SampleSetSampleLoader,
+        Swing, BPM,
+    },
 };
 
 pub enum Message {
@@ -41,20 +48,20 @@ pub enum Message {
 
 struct State {
     renderer: DrumkitSequenceRenderer,
-
-    // TODO: maybe `paused` belongs in DrumkitSequenceRenderer?
     paused: bool,
-
     buffer: Vec<f32>,
     buffer_tx: HeapProd<f32>,
     pull_request_rx: Receiver<audiothread::PulledSourcePullRequest>,
     control_rx: Receiver<Message>,
+    events: VecDeque<DrumkitSequenceEvent>,
+    event_tx: Option<single_value_channel::Updater<Option<DrumkitSequenceEvent>>>,
 }
 
 impl State {
     pub fn new(
         audiothread_tx: Sender<audiothread::Message>,
         control_rx: Receiver<Message>,
+        event_tx: Option<single_value_channel::Updater<Option<DrumkitSequenceEvent>>>,
     ) -> Result<Self, Error> {
         let (spec_tx, spec_rx) = channel::<audiothread::AudioSpec>();
 
@@ -101,6 +108,8 @@ impl State {
             buffer_tx,
             pull_request_rx,
             control_rx,
+            events: VecDeque::new(),
+            event_tx,
         })
     }
 }
@@ -108,10 +117,11 @@ impl State {
 pub fn spawn(
     audiothread_tx: Sender<audiothread::Message>,
     control_rx: Receiver<Message>,
+    event_tx: Option<single_value_channel::Updater<Option<DrumkitSequenceEvent>>>,
 ) -> std::thread::JoinHandle<()> {
-    // TODO: consider switching to crossbeam-channel, for "select!"
+    // TODO: consider switching to crossbeam-channel (or flume?), for "select!"
     std::thread::spawn(move || {
-        let mut rts = match State::new(audiothread_tx, control_rx) {
+        let mut rts = match State::new(audiothread_tx, control_rx, event_tx) {
             Ok(rts) => rts,
             Err(e) => {
                 log::log!(
@@ -124,6 +134,7 @@ pub fn spawn(
 
         let mut shutdown_request: Option<std::time::Instant> = None;
         let shutdown_timeout = std::time::Duration::from_secs(3);
+        let send_events = rts.event_tx.is_some();
 
         loop {
             match (shutdown_request, rts.control_rx.try_recv()) {
@@ -175,8 +186,17 @@ pub fn spawn(
                     let num_vacant = rts.buffer_tx.vacant_len();
 
                     if !rts.paused {
-                        rts.renderer
+                        let (_, events) = rts
+                            .renderer
                             .render(&mut rts.buffer.as_mut_slice()[..num_vacant]);
+
+                        if send_events {
+                            if let Some(events) = events {
+                                for event in events {
+                                    rts.events.push_back(event);
+                                }
+                            }
+                        }
                     } else {
                         // TODO: add pausing on the audiothread side?
                         rts.buffer[..num_vacant].fill(0.0f32);
@@ -230,6 +250,25 @@ pub fn spawn(
                     );
 
                     break;
+                }
+            }
+
+            if send_events {
+                while !rts.events.is_empty() {
+                    match rts.events.front() {
+                        Some(ev) if ev.time <= Instant::now() => {
+                            match rts
+                                .event_tx
+                                .as_ref()
+                                .unwrap()
+                                .update(Some(rts.events.pop_front().unwrap()))
+                            {
+                                Ok(_) => (),
+                                Err(e) => log::log!(log::Level::Debug, "Failed sending event: {e}"),
+                            }
+                        }
+                        _ => break,
+                    }
                 }
             }
 
@@ -321,7 +360,7 @@ mod tests {
         audiothread::spawn(audiothread_rx, Some(audiothread::Opts::default()));
 
         let (control_tx, control_rx) = channel::<Message>();
-        spawn(audiothread_tx.clone(), control_rx);
+        spawn(audiothread_tx.clone(), control_rx, None);
 
         let _ = control_tx.send(Message::LoadSampleSet(drumkit_loader()));
         let _ = control_tx.send(Message::SetSequence(basic_beat()));

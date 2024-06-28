@@ -30,6 +30,7 @@ ringbuf = "0.4.1"
 samplerate = "0.2.4"
 serde_json = "1.0.115"
 serde = { version = "1.0.197", features = ["derive"] }
+single_value_channel = "1.2.2"
 symphonia = { version = "0.5.4", features = ["all-codecs"] }
 thiserror = "1.0.58"
 uuid = { version = "1.8.0", features = ["v4", "serde"] }

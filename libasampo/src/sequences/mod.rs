@@ -9,7 +9,9 @@ use crate::{prelude::ConcreteSampleSetLabelling, samplesets::DrumkitLabelling};
 mod render;
 mod time;
 
-pub use render::{DrumkitSampleLoader, DrumkitSequenceRenderer, SampleSetSampleLoader};
+pub use render::{
+    DrumkitSampleLoader, DrumkitSequenceEvent, DrumkitSequenceRenderer, SampleSetSampleLoader,
+};
 pub use time::{NoteLength, Samplerate, Swing, TimeSignature, TimeSpec, BPM};
 
 #[cfg(feature = "audiothread-integration")]
