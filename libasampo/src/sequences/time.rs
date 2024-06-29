@@ -6,7 +6,7 @@ use std::num::{NonZeroU16, NonZeroU32, NonZeroU8};
 
 use crate::errors::Error;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteLength {
     Eighth,
     Sixteenth,
@@ -21,7 +21,7 @@ impl NoteLength {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Samplerate(NonZeroU32);
 
 impl Samplerate {
@@ -44,7 +44,7 @@ impl TryFrom<u32> for Samplerate {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BPM(NonZeroU16);
 
 impl BPM {
@@ -67,7 +67,7 @@ impl TryFrom<u16> for BPM {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeSignature {
     upper: NonZeroU8,
     lower: NonZeroU8,
@@ -105,6 +105,14 @@ impl TryFrom<(u8, u8)> for TimeSignature {
 #[derive(Debug, Clone, Copy)]
 pub struct Swing(f64);
 
+impl PartialEq for Swing {
+    fn eq(&self, other: &Self) -> bool {
+        (self.0 - other.0).abs() < f64::EPSILON
+    }
+}
+
+impl Eq for Swing {}
+
 impl Swing {
     pub fn new(value: f64) -> Result<Self, Error> {
         value.try_into()
@@ -129,7 +137,7 @@ impl TryFrom<f64> for Swing {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeSpec {
     pub bpm: BPM,
     pub signature: TimeSignature,

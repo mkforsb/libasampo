@@ -26,6 +26,23 @@ pub struct Trigger<T: ConcreteSampleSetLabelling> {
     amplitude: f32,
 }
 
+impl<T> PartialEq for Trigger<T>
+where
+    T: ConcreteSampleSetLabelling,
+    T::Label: PartialEq,
+{
+    fn eq(&self, other: &Trigger<T>) -> bool {
+        self.label == other.label
+    }
+}
+
+impl<T> Eq for Trigger<T>
+where
+    T: ConcreteSampleSetLabelling,
+    T::Label: PartialEq,
+{
+}
+
 #[derive(Debug, Clone)]
 pub struct StepInfo<'a, T: ConcreteSampleSetLabelling> {
     length_in_samples: f64,
@@ -47,7 +64,7 @@ pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
     fn unset_step_trigger(&mut self, n: usize, label: T::Label);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DrumkitSequence {
     timespec: TimeSpec,
     step_base_length: NoteLength,
