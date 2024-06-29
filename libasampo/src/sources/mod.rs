@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::{Read, Seek};
 use std::sync::mpsc::Sender;
 
+use file_system_source::FilesystemSource;
 use uuid::Uuid;
 
 use crate::errors::Error;
@@ -348,7 +349,9 @@ impl Clone for Source {
 impl std::fmt::Debug for Source {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Source::FilesystemSource(_) => f.write_str("FilesystemSource"),
+            Source::FilesystemSource(source) => {
+                <FilesystemSource<_> as std::fmt::Debug>::fmt(source, f)
+            }
 
             #[cfg(feature = "mocks")]
             Source::MockSource(_) => f.write_str("MockSource"),
