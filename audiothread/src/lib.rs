@@ -34,6 +34,7 @@ pub use crate::{
         pulled::{PulledSourcePullReply, PulledSourcePullRequest, PulledSourceSetup},
         symphonia::SymphoniaSource,
     },
+    source::{SourceMatcher, SourceType},
     types::{AudioSpec, NonZeroNumFrames, NumChannels, NumFrames, Quality, Samplerate},
 };
 
@@ -42,6 +43,7 @@ pub use crate::{
 pub enum Message {
     Shutdown,
     DropAll,
+    DropAllMatching(SourceMatcher),
     PlaySymphoniaSource(SymphoniaSource),
     CreatePulledSource(PulledSourceSetup),
     GetOutputSpec(Sender<AudioSpec>),
@@ -338,6 +340,10 @@ fn threadloop(rx: mpsc::Receiver<Message>, opts: Option<Opts>) {
                             break;
                         }
                         Message::DropAll => sourcegroups.borrow_mut().clear(),
+                        Message::DropAllMatching(matcher) => sourcegroups
+                            .borrow_mut()
+                            .iter_mut()
+                            .for_each(|(_, group)| group.drop_matching_sources(&matcher)),
                         Message::PlaySymphoniaSource(sf) => {
                             let _ = sourcegroups
                                 .borrow_mut()

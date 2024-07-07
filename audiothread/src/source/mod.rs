@@ -168,6 +168,10 @@ impl SourceGroup {
             .retain(|source| source.stream_state() != StreamState::Complete)
     }
 
+    pub fn drop_matching_sources(&mut self, matcher: &SourceMatcher) {
+        self.sources.retain(|source| !matcher.matches(source))
+    }
+
     pub fn sources_len(&self) -> usize {
         self.sources.len()
     }
@@ -319,5 +323,42 @@ fn make_rate_conversion(
             .unwrap(),
         ),
         std::cmp::Ordering::Equal => None,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SourceType {
+    SymphoniaSource,
+    PulledSource,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SourceMatcher {
+    typ: Option<SourceType>,
+}
+
+impl SourceMatcher {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[allow(clippy::needless_update)]
+    pub fn match_type(self, typ: SourceType) -> Self {
+        Self {
+            typ: Some(typ),
+            ..self
+        }
+    }
+
+    fn matches(&self, source: &Source) -> bool {
+        if let Some(typ) = &self.typ {
+            match (typ, source) {
+                (SourceType::SymphoniaSource, Source::SymphoniaSource(_)) => (),
+                (SourceType::PulledSource, Source::PulledSource(_)) => (),
+                _ => return false,
+            };
+        }
+
+        true
     }
 }
