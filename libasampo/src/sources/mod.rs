@@ -379,6 +379,8 @@ impl std::cmp::PartialEq for Source {
     }
 }
 
+impl std::cmp::Eq for Source {}
+
 #[cfg(test)]
 mod tests {
     use std::io::SeekFrom;
