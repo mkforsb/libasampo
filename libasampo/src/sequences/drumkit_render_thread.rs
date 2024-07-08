@@ -33,6 +33,7 @@ pub enum Message {
     SetTempo(BPM),
     SetSwing(Swing),
     SetSequence(DrumkitSequence),
+    ResetSequence,
     ClearSequence,
     EditSequenceClearStep(usize),
     EditSequenceSetStepTrigger {
@@ -154,6 +155,7 @@ pub fn spawn(
                     Message::SetTempo(bpm) => rts.renderer.set_tempo(bpm),
                     Message::SetSwing(swing) => rts.renderer.set_swing(swing),
                     Message::SetSequence(seq) => rts.renderer.set_sequence(seq),
+                    Message::ResetSequence => rts.renderer.reset_sequence(),
                     Message::ClearSequence => rts.renderer.sequence_clear(),
                     Message::EditSequenceClearStep(n) => rts.renderer.sequence_clear_step(n),
                     Message::EditSequenceSetStepTrigger { step, label, amp } => {
