@@ -13,7 +13,7 @@ use crate::{
     serialize::{TryFromDomain, TryIntoDomain},
 };
 
-const DRUMKIT_LABELS: [(&str, crate::samplesets::DrumkitLabel); 16] = [
+pub const DRUMKIT_LABELS: [(&str, crate::samplesets::DrumkitLabel); 16] = [
     ("RimShot", crate::samplesets::DrumkitLabel::RimShot),
     ("Clap", crate::samplesets::DrumkitLabel::Clap),
     ("ClosedHihat", crate::samplesets::DrumkitLabel::ClosedHihat),

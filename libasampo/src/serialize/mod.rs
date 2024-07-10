@@ -6,10 +6,12 @@ use crate::errors::Error;
 
 mod samples;
 mod samplesets;
+mod sequences;
 mod sources;
 
 pub use samples::Sample;
 pub use samplesets::SampleSet;
+pub(crate) use samplesets::DRUMKIT_LABELS;
 pub use sources::Source;
 
 pub trait TryIntoDomain<T> {
