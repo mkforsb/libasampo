@@ -16,6 +16,7 @@ pub use render::{
     DrumkitSampleLoader, DrumkitSequenceEvent, DrumkitSequenceRenderer, SampleSetSampleLoader,
 };
 pub use time::{NoteLength, Samplerate, Swing, TimeSignature, TimeSpec, BPM};
+use uuid::Uuid;
 
 #[cfg(feature = "audiothread-integration")]
 pub mod drumkit_render_thread;
@@ -73,6 +74,8 @@ impl<'a, T: ConcreteSampleSetLabelling> StepInfo<'a, T> {
 }
 
 pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
+    fn name(&self) -> &String;
+    fn uuid(&self) -> Uuid;
     fn timespec(&self) -> TimeSpec;
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
@@ -89,6 +92,8 @@ pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DrumkitSequence {
+    uuid: Uuid,
+    name: String,
     timespec: TimeSpec,
     step_base_length: NoteLength,
     steps: Vec<Vec<Trigger<DrumkitLabelling>>>,
@@ -106,10 +111,26 @@ impl DrumkitSequence {
         }
 
         DrumkitSequence {
+            uuid: Uuid::new_v4(),
+            name: "Unnamed sequence".to_string(),
             timespec,
             step_base_length,
             steps,
         }
+    }
+
+    pub fn new_named(
+        name: impl Into<String>,
+        timespec: TimeSpec,
+        step_base_length: NoteLength,
+    ) -> Self {
+        let mut result = Self::new(timespec, step_base_length);
+        result.name = name.into();
+        result
+    }
+
+    pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
+        self.uuid = uuid;
     }
 
     pub fn labels_at_step(&self, n: usize) -> Option<Vec<DrumkitLabel>> {
@@ -125,15 +146,19 @@ impl DrumkitSequence {
 
 impl Default for DrumkitSequence {
     fn default() -> Self {
-        DrumkitSequence {
-            timespec: TimeSpec::new(120, 4, 4).unwrap(),
-            step_base_length: NoteLength::Sixteenth,
-            steps: vec![Vec::new(); 16],
-        }
+        DrumkitSequence::new(TimeSpec::new(120, 4, 4).unwrap(), NoteLength::Sixteenth)
     }
 }
 
 impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
+    fn name(&self) -> &String {
+        &self.name
+    }
+
+    fn uuid(&self) -> Uuid {
+        self.uuid
+    }
+
     fn timespec(&self) -> TimeSpec {
         self.timespec
     }
