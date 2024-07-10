@@ -12,6 +12,7 @@ mod sources;
 pub use samples::Sample;
 pub use samplesets::SampleSet;
 pub(crate) use samplesets::DRUMKIT_LABELS;
+pub use sequences::Sequence;
 pub use sources::Source;
 
 pub trait TryIntoDomain<T> {

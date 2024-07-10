@@ -123,6 +123,27 @@ impl TryIntoDomain<crate::sequences::DrumkitSequence> for DrumkitSequenceV1 {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Sequence {
+    DrumkitSequenceV1(DrumkitSequenceV1),
+}
+
+impl TryIntoDomain<crate::sequences::DrumkitSequence> for Sequence {
+    fn try_into_domain(self) -> Result<crate::sequences::DrumkitSequence, Error> {
+        match self {
+            Sequence::DrumkitSequenceV1(seq) => seq.try_into_domain(),
+        }
+    }
+}
+
+impl TryFromDomain<crate::sequences::DrumkitSequence> for Sequence {
+    fn try_from_domain(value: &crate::sequences::DrumkitSequence) -> Result<Self, Error> {
+        Ok(Sequence::DrumkitSequenceV1(
+            DrumkitSequenceV1::try_from_domain(value)?,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{samplesets::DrumkitLabel, sequences::DrumkitSequence};
