@@ -26,6 +26,19 @@ pub struct Trigger<T: ConcreteSampleSetLabelling> {
     amplitude: f32,
 }
 
+impl<T> Trigger<T>
+where
+    T: ConcreteSampleSetLabelling,
+{
+    pub fn label(&self) -> T::Label {
+        self.label.clone()
+    }
+
+    pub fn amplitude(&self) -> f32 {
+        self.amplitude
+    }
+}
+
 impl<T> PartialEq for Trigger<T>
 where
     T: ConcreteSampleSetLabelling,
@@ -47,6 +60,16 @@ where
 pub struct StepInfo<'a, T: ConcreteSampleSetLabelling> {
     length_in_samples: f64,
     triggers: &'a Vec<Trigger<T>>,
+}
+
+impl<'a, T: ConcreteSampleSetLabelling> StepInfo<'a, T> {
+    pub fn length_in_samples(&self) -> f64 {
+        self.length_in_samples
+    }
+
+    pub fn triggers(&self) -> &'a Vec<Trigger<T>> {
+        self.triggers
+    }
 }
 
 pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
