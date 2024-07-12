@@ -75,6 +75,7 @@ impl<'a, T: ConcreteSampleSetLabelling> StepInfo<'a, T> {
 
 pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
     fn name(&self) -> &String;
+    fn set_name(&mut self, name: impl Into<String>);
     fn uuid(&self) -> Uuid;
     fn timespec(&self) -> TimeSpec;
     fn len(&self) -> usize;
@@ -153,6 +154,10 @@ impl Default for DrumkitSequence {
 impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
     fn name(&self) -> &String {
         &self.name
+    }
+
+    fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into()
     }
 
     fn uuid(&self) -> Uuid {
