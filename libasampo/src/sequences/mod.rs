@@ -130,6 +130,16 @@ impl DrumkitSequence {
         result
     }
 
+    pub fn new_from(sequence: &DrumkitSequence) -> DrumkitSequence {
+        DrumkitSequence {
+            uuid: Uuid::new_v4(),
+            name: sequence.name.clone(),
+            timespec: sequence.timespec,
+            step_base_length: sequence.step_base_length,
+            steps: sequence.steps.clone(),
+        }
+    }
+
     pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
         self.uuid = uuid;
     }
