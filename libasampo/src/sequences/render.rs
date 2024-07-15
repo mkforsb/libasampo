@@ -343,8 +343,8 @@ mod dksrender {
                     // fetch next step and add active sounds
                     *current_step = (*current_step + 1) % self.sequence.len();
 
-                    if let Some(step) = self.sequence.step(*current_step, self.output_samplerate) {
-                        *step_frames_remain += step.length_in_samples;
+                    if let Some(step) = self.sequence.step(*current_step) {
+                        *step_frames_remain += step.length_in_samples(self.output_samplerate);
 
                         step.triggers
                             .iter()
@@ -482,8 +482,8 @@ mod dksrender {
             samples: &HashMap<DrumkitLabel, Vec<f32>>,
             samples_generation: usize,
         ) -> LoadedSequenceInfo {
-            let step0 = seq.step(0, output_samplerate).unwrap();
-            let step_frames_remain = step0.length_in_samples;
+            let step0 = seq.step(0).unwrap();
+            let step_frames_remain = step0.length_in_samples(output_samplerate);
 
             let active_sounds = step0
                 .triggers

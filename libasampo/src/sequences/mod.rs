@@ -59,13 +59,13 @@ where
 
 #[derive(Debug, Clone)]
 pub struct StepInfo<'a, T: ConcreteSampleSetLabelling> {
-    length_in_samples: f64,
+    length_in_samples_48k: f64,
     triggers: &'a Vec<Trigger<T>>,
 }
 
 impl<'a, T: ConcreteSampleSetLabelling> StepInfo<'a, T> {
-    pub fn length_in_samples(&self) -> f64 {
-        self.length_in_samples
+    pub fn length_in_samples(&self, samplerate: Samplerate) -> f64 {
+        self.length_in_samples_48k * ((samplerate.get() as f64) / 48000.0)
     }
 
     pub fn triggers(&self) -> &'a Vec<Trigger<T>> {
@@ -81,7 +81,7 @@ pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
     fn step_base_len(&self) -> NoteLength;
-    fn step(&self, n: usize, samplerate: Samplerate) -> Option<StepInfo<T>>;
+    fn step(&self, n: usize) -> Option<StepInfo<T>>;
     fn set_timespec(&mut self, spec: TimeSpec);
     fn set_len(&mut self, len: usize);
     fn set_step_base_len(&mut self, len: NoteLength);
@@ -190,16 +190,17 @@ impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
         self.step_base_length
     }
 
-    fn step(&self, n: usize, samplerate: Samplerate) -> Option<StepInfo<DrumkitLabelling>> {
+    fn step(&self, n: usize) -> Option<StepInfo<DrumkitLabelling>> {
         if let Some(triggers) = self.steps.get(n) {
             let base_len_in_samples = self
                 .timespec
-                .samples_per_note(samplerate, self.step_base_length);
+                .samples_per_note(48000.try_into().unwrap(), self.step_base_length);
 
             let sign = if n % 2 == 0 { 1.0 } else { -1.0 };
 
             Some(StepInfo {
-                length_in_samples: base_len_in_samples * (1.0 + (sign * self.timespec.swing.get())),
+                length_in_samples_48k: base_len_in_samples
+                    * (1.0 + (sign * self.timespec.swing.get())),
                 triggers,
             })
         } else {
@@ -323,10 +324,7 @@ mod tests {
     {
         range
             .into_iter()
-            .filter(|n| {
-                matches!(seq.step(*n, 44100.try_into().unwrap()),
-                         Some(info) if !info.triggers.is_empty())
-            })
+            .filter(|n| matches!(seq.step(*n), Some(info) if !info.triggers.is_empty()))
             .collect::<Vec<usize>>()
     }
 
@@ -335,9 +333,9 @@ mod tests {
         let seq = drumkitseq1();
 
         assert!((0..16).all(|n| f64_eq(
-            seq.step(n, 44100.try_into().unwrap())
+            seq.step(n)
                 .unwrap()
-                .length_in_samples,
+                .length_in_samples(44100.try_into().unwrap()),
             5512.5
         )));
     }
@@ -354,19 +352,19 @@ mod tests {
         let rate: Samplerate = 44100.try_into().unwrap();
 
         assert!(f64_eq(
-            seq.step(0, rate).unwrap().length_in_samples,
+            seq.step(0).unwrap().length_in_samples(rate),
             8268.75
         ));
         assert!(f64_eq(
-            seq.step(1, rate).unwrap().length_in_samples,
+            seq.step(1).unwrap().length_in_samples(rate),
             2756.25
         ));
         assert!(f64_eq(
-            seq.step(2, rate).unwrap().length_in_samples,
+            seq.step(2).unwrap().length_in_samples(rate),
             8268.75
         ));
         assert!(f64_eq(
-            seq.step(3, rate).unwrap().length_in_samples,
+            seq.step(3).unwrap().length_in_samples(rate),
             2756.25
         ));
     }
@@ -390,7 +388,7 @@ mod tests {
         assert_eq!(steps_with_triggers(0..100, &seq), vec![0, 1, 4, 8, 12]);
 
         assert!(seq
-            .step(1, 44100.try_into().unwrap())
+            .step(1)
             .unwrap()
             .triggers
             .iter()

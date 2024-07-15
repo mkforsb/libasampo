@@ -40,7 +40,7 @@ impl TryFromDomain<crate::sequences::DrumkitSequence> for DrumkitSequenceV1 {
         let mut steps: Vec<Vec<TriggerV1>> = Vec::new();
 
         for i in 0..value.len() {
-            if let Some(stepinfo) = value.step(i, 48000.try_into()?) {
+            if let Some(stepinfo) = value.step(i) {
                 steps.push(
                     stepinfo
                         .triggers()
