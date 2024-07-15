@@ -16,7 +16,6 @@ pub struct FilesystemSourceV1 {
     name: Option<String>,
     uuid: Uuid,
     path: String,
-    uri: String,
     exts: Vec<String>,
     enabled: bool,
 }
@@ -32,6 +31,7 @@ impl TryIntoDomain<fs_source::FilesystemSource<fs_source::io::DefaultIO>> for Fi
             fs_source::io::DefaultIO(),
         );
         src.set_uuid(self.uuid);
+        src.set_enabled(self.enabled);
         Ok(src)
     }
 }
@@ -42,7 +42,6 @@ impl<T: fs_source::io::IO> TryFromDomain<fs_source::FilesystemSource<T>> for Fil
             name: src.name().map(|s| s.to_string()),
             uuid: *src.uuid(),
             path: src.path().to_string(),
-            uri: src.uri().to_string(),
             exts: src.exts().clone(),
             enabled: src.is_enabled(),
         })
@@ -95,15 +94,13 @@ mod tests {
         let name = Some(s("Name"));
         let uuid = Uuid::new_v4();
         let path = s("/home");
-        let uri = s("file:///home");
         let exts = vec![s("wav"), s("ogg")];
-        let enabled = true;
+        let enabled = false;
 
         let x = Source::FilesystemSourceV1(FilesystemSourceV1 {
             name: name.clone(),
             uuid,
             path: path.clone(),
-            uri: uri.clone(),
             exts: exts.clone(),
             enabled,
         });
@@ -116,7 +113,6 @@ mod tests {
                 assert_eq!(decoded_src.name, name);
                 assert_eq!(decoded_src.uuid, uuid);
                 assert_eq!(decoded_src.path, path);
-                assert_eq!(decoded_src.uri, uri);
                 assert_eq!(decoded_src.exts, exts);
                 assert_eq!(decoded_src.enabled, enabled);
             }
@@ -131,7 +127,6 @@ mod tests {
             crate::sources::Source::FilesystemSource(domained_src) => {
                 assert_eq!(domained_src.name(), name.as_deref());
                 assert_eq!(domained_src.uuid(), &uuid);
-                assert_eq!(domained_src.uri(), uri);
                 assert_eq!(domained_src.is_enabled(), enabled);
             }
 
