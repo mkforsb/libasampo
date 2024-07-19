@@ -6,18 +6,15 @@ use std::{cmp::Ordering, collections::HashMap};
 
 use crate::{
     convert::{convert, decode, ChannelMapping, RateConversion},
-    prelude::{
-        ConcreteSampleSetLabelling, SampleOps, SampleSetLabellingOps, SampleSetOps, SourceOps,
-        StepSequenceOps,
-    },
+    prelude::{SampleOps, SampleSetOps, SourceOps, StepSequenceOps},
     samples::SampleMetadata,
-    samplesets::{DrumkitLabel, SampleSet, SampleSetLabelling},
+    samplesets::{DrumkitLabel, SampleSet},
     sequences::{DrumkitSequence, Samplerate},
     sources::Source,
 };
 
 pub trait DrumkitSampleLoader {
-    fn load_sample(&self, label_to_load: &DrumkitLabel) -> Option<(SampleMetadata, Vec<f32>)>;
+    fn load_sample(&self, label_to_load: DrumkitLabel) -> Option<(SampleMetadata, Vec<f32>)>;
     fn labels(&self) -> Vec<DrumkitLabel>;
 }
 
@@ -37,44 +34,40 @@ impl SampleSetSampleLoader {
 }
 
 impl DrumkitSampleLoader for SampleSetSampleLoader {
-    fn load_sample(&self, label_to_load: &DrumkitLabel) -> Option<(SampleMetadata, Vec<f32>)> {
-        match self.sample_set.labelling() {
-            Some(SampleSetLabelling::DrumkitLabelling(labelling)) if !labelling.is_empty() => self
-                .sample_set
-                .list()
-                .iter()
-                .find(|sample| {
-                    labelling
-                        .get(sample.uri())
-                        .is_some_and(|sample_label| sample_label == label_to_load)
-                })
-                .and_then(|sample| {
-                    self.sources
-                        .iter()
-                        .find(|source| {
-                            source.uuid()
-                                == sample
-                                    .source_uuid()
-                                    .expect("Loadable samples should have a source UUID")
-                        })
-                        .and_then(|source| {
-                            Some((sample.metadata().clone(), decode(source, sample).ok()?))
-                        })
-                }),
-            Some(SampleSetLabelling::DrumkitLabelling(_)) | None => None,
-        }
+    fn load_sample(&self, label_to_load: DrumkitLabel) -> Option<(SampleMetadata, Vec<f32>)> {
+        self.sample_set
+            .list()
+            .iter()
+            .find(|sample| {
+                self.sample_set
+                    .get_label::<DrumkitLabel>(sample)
+                    .is_ok_and(|sample_label| sample_label == Some(label_to_load))
+            })
+            .and_then(|sample| {
+                self.sources
+                    .iter()
+                    .find(|source| {
+                        source.uuid()
+                            == sample
+                                .source_uuid()
+                                .expect("Loadable samples should have a source UUID")
+                    })
+                    .and_then(|source| {
+                        Some((sample.metadata().clone(), decode(source, sample).ok()?))
+                    })
+            })
     }
 
     fn labels(&self) -> Vec<DrumkitLabel> {
-        match self.sample_set.labelling() {
-            Some(SampleSetLabelling::DrumkitLabelling(labelling)) if !labelling.is_empty() => self
-                .sample_set
-                .list()
-                .iter()
-                .filter_map(|s| labelling.get(s.uri()).cloned())
-                .collect(),
-            Some(SampleSetLabelling::DrumkitLabelling(_)) | None => vec![],
-        }
+        self.sample_set
+            .list()
+            .iter()
+            .filter_map(|s| {
+                self.sample_set
+                    .get_label::<DrumkitLabel>(s)
+                    .map_or(None, |x| x)
+            })
+            .collect()
     }
 }
 
@@ -434,7 +427,7 @@ mod dksrender {
             let mut result = HashMap::<DrumkitLabel, Vec<f32>>::new();
 
             for label in loader.labels() {
-                let (metadata, audio_data) = loader.load_sample(&label).unwrap();
+                let (metadata, audio_data) = loader.load_sample(label).unwrap();
 
                 result.insert(
                     label,
@@ -455,7 +448,7 @@ mod dksrender {
                         let mut result = HashMap::<DrumkitLabel, Vec<f32>>::new();
 
                         for label in loader.labels() {
-                            let (metadata, audio_data) = loader.load_sample(&label).unwrap();
+                            let (metadata, audio_data) = loader.load_sample(label).unwrap();
 
                             result.insert(
                                 label,
@@ -670,7 +663,7 @@ mod tests {
     use std::env;
 
     use crate::{
-        samplesets::{BaseSampleSet, DrumkitLabelling},
+        samplesets::BaseSampleSet,
         sequences::{time::Swing, NoteLength, TimeSpec, BPM},
         sources::{file_system_source::FilesystemSource, Source},
     };
@@ -698,13 +691,9 @@ mod tests {
         set.add_with_hash(ch.clone(), "ch".to_string());
         set.add_with_hash(sd.clone(), "sd".to_string());
 
-        let mut labels = DrumkitLabelling::new();
-
-        labels.set(bd.uri().clone(), DrumkitLabel::BassDrum);
-        labels.set(ch.uri().clone(), DrumkitLabel::ClosedHihat);
-        labels.set(sd.uri().clone(), DrumkitLabel::SnareDrum);
-
-        set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(labels)));
+        set.set_label(bd, DrumkitLabel::BassDrum).unwrap();
+        set.set_label(ch, DrumkitLabel::ClosedHihat).unwrap();
+        set.set_label(sd, DrumkitLabel::SnareDrum).unwrap();
 
         (source, set)
     }
@@ -863,26 +852,24 @@ mod tests {
 
         let (source, mut set) = drumkit();
 
-        macro_rules! uri {
+        macro_rules! member {
             ($set:ident, $name:expr) => {
                 $set.list()
                     .iter()
-                    .find(|s| s.name() == $name)
+                    .cloned()
+                    .cloned()
+                    .find(|sample| sample.name() == $name)
                     .unwrap()
-                    .uri()
-                    .clone()
             };
         }
 
-        let bd_uri = uri!(set, "kick.wav");
-        let ch_uri = uri!(set, "hihat.wav");
-        let sd_uri = uri!(set, "snare.wav");
+        let bd = member!(set, "kick.wav");
+        let ch = member!(set, "hihat.wav");
+        let sd = member!(set, "snare.wav");
 
-        if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
-            labels.set(bd_uri, DrumkitLabel::SnareDrum);
-            labels.set(ch_uri, DrumkitLabel::BassDrum);
-            labels.set(sd_uri, DrumkitLabel::ClosedHihat);
-        }
+        set.set_label(&bd, DrumkitLabel::SnareDrum).unwrap();
+        set.set_label(&ch, DrumkitLabel::BassDrum).unwrap();
+        set.set_label(&sd, DrumkitLabel::ClosedHihat).unwrap();
 
         assert_eq!(renderer.render(buf1.as_mut_slice()).0, buf1.len());
 

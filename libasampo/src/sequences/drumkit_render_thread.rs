@@ -289,9 +289,7 @@ mod tests {
 
     use crate::{
         prelude::*,
-        samplesets::{
-            BaseSampleSet, DrumkitLabel, DrumkitLabelling, SampleSet, SampleSetLabelling,
-        },
+        samplesets::{BaseSampleSet, DrumkitLabel, SampleSet},
         sequences::{NoteLength, TimeSpec},
         sources::{file_system_source::FilesystemSource, Source},
     };
@@ -317,13 +315,9 @@ mod tests {
         set.add_with_hash(ch.clone(), "ch".to_string());
         set.add_with_hash(sd.clone(), "sd".to_string());
 
-        let mut labels = DrumkitLabelling::new();
-
-        labels.set(bd.uri().clone(), DrumkitLabel::BassDrum);
-        labels.set(ch.uri().clone(), DrumkitLabel::ClosedHihat);
-        labels.set(sd.uri().clone(), DrumkitLabel::SnareDrum);
-
-        set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(labels)));
+        set.set_label(&bd, DrumkitLabel::BassDrum).unwrap();
+        set.set_label(&ch, DrumkitLabel::ClosedHihat).unwrap();
+        set.set_label(&sd, DrumkitLabel::SnareDrum).unwrap();
 
         (source, set)
     }

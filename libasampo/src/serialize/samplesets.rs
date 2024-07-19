@@ -7,10 +7,11 @@ use uuid::Uuid;
 
 use crate::{
     errors::Error,
-    prelude::ConcreteSampleSetLabelling,
-    samples::SampleOps,
-    samplesets::{SampleSetLabelling, SampleSetOps},
-    serialize::{TryFromDomain, TryIntoDomain},
+    samplesets::{
+        BaseSampleSet as DomBaseSampleSet, DrumkitLabel, Label, SampleSet as DomSampleSet,
+        SampleSetOps,
+    },
+    serialize::{samples::Sample as SerSample, TryFromDomain, TryIntoDomain},
 };
 
 pub const DRUMKIT_LABELS: [(&str, crate::samplesets::DrumkitLabel); 16] = [
@@ -32,128 +33,109 @@ pub const DRUMKIT_LABELS: [(&str, crate::samplesets::DrumkitLabel); 16] = [
     ("Perc4", crate::samplesets::DrumkitLabel::Perc4),
 ];
 
+fn key_for(label: DrumkitLabel) -> Option<&'static str> {
+    DRUMKIT_LABELS
+        .iter()
+        .find(|(_key, val)| *val == label)
+        .map(|(key, _val)| *key)
+}
+
+fn label_for(key: &str) -> Option<DrumkitLabel> {
+    DRUMKIT_LABELS
+        .iter()
+        .find(|(k, _val)| *k == key)
+        .map(|(_k, val)| *val)
+}
+
+fn substr(s: &str, start: usize, len: usize) -> String {
+    let mut result: Box<dyn Iterator<Item = char>> = Box::new(s.chars());
+
+    if start > 0 {
+        result = Box::new(result.skip(start));
+    }
+
+    if len > 0 {
+        result = Box::new(result.take(len));
+    }
+
+    result.collect()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntryV1 {
+    sample: SerSample,
+    label: Option<String>,
+    audio_hash: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseSampleSetV1 {
     uuid: Uuid,
     name: String,
-    samples: Vec<crate::serialize::samples::Sample>,
-    labelling_kind: String,
-    labels: Option<Vec<Option<String>>>,
-    audio_hash: Vec<String>,
+    samples: Vec<EntryV1>,
 }
 
-impl TryIntoDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
-    fn try_into_domain(self) -> Result<crate::samplesets::BaseSampleSet, Error> {
-        let mut result = crate::samplesets::BaseSampleSet::new(self.name);
+impl TryIntoDomain<DomBaseSampleSet> for BaseSampleSetV1 {
+    fn try_into_domain(self) -> Result<DomBaseSampleSet, Error> {
+        let mut result = DomBaseSampleSet::new(self.name);
         result.set_uuid(self.uuid);
 
-        let samples = self
-            .samples
-            .into_iter()
-            .map(|x| x.try_into_domain())
-            .collect::<Result<Vec<_>, Error>>()?;
+        for entry in self.samples {
+            let sample = entry.sample.try_into_domain()?;
 
-        for (i, sample) in samples.iter().enumerate() {
-            result.add_with_hash(
-                sample.clone(),
-                self.audio_hash
-                    .get(i)
-                    .cloned()
-                    .ok_or(Error::DeserializationError(
-                        "Serialized sample set missing audio hash for sample".to_string(),
-                    ))?,
-            );
-        }
+            result.add_with_hash(sample.clone(), entry.audio_hash);
 
-        if self.labelling_kind.as_str() == "drumkit" {
-            let labels = self.labels.expect(
-                "Serialized sample set with labelling_kind != none should contain \
-                    list of labels",
-            );
-
-            if labels.len() < samples.len() {
-                return Err(Error::DeserializationError(
-                    "Serialized sample set missing labels".to_string(),
-                ));
-            }
-
-            let mut labelling = crate::samplesets::DrumkitLabelling::new();
-
-            for (i, sample) in samples.iter().enumerate() {
-                match labels.get(i).unwrap() {
-                    Some(label) => labelling.set(
-                        sample.uri().clone(),
-                        DRUMKIT_LABELS
-                            .iter()
-                            .find(|(s, _val)| s == label)
-                            .map(|(_s, val)| *val)
-                            .ok_or(Error::DeserializationError(
-                                "Unknown drumkit label".to_string(),
-                            ))?,
-                    ),
-                    None => (),
-                }
-            }
-
-            result.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(labelling)));
+            result.set_label::<Label, Option<Label>>(
+                &sample,
+                if let Some(text) = entry.label {
+                    if text.starts_with("DrumkitLabel.") {
+                        Some(Label::DrumkitLabel(
+                            label_for(&substr(&text, 13, 0))
+                                .ok_or(Error::DeserializationError("Unknown label".to_string()))?,
+                        ))
+                    } else {
+                        Err(Error::DeserializationError("Unknown label".to_string()))?
+                    }
+                } else {
+                    None
+                },
+            )?;
         }
 
         Ok(result)
     }
 }
 
-impl TryFromDomain<crate::samplesets::BaseSampleSet> for BaseSampleSetV1 {
-    fn try_from_domain(value: &crate::samplesets::BaseSampleSet) -> Result<Self, Error> {
-        let uuid = *value.uuid();
-        let name = value.name().to_string();
-        let samples = value
+impl TryFromDomain<DomBaseSampleSet> for BaseSampleSetV1 {
+    fn try_from_domain(set: &DomBaseSampleSet) -> Result<Self, Error> {
+        let uuid = set.uuid();
+        let name = set.name().to_string();
+        let samples = set
             .list()
             .iter()
-            .map(|x| (*x).clone())
-            .collect::<Vec<_>>();
+            .map(|sample| -> Result<EntryV1, Error> {
+                let label = set.get_label::<Label>(sample)?;
+                let audio_hash = set.cached_audio_hash_of(sample)?.to_string();
 
-        let (labelling_kind, labels) = match value.labelling() {
-            Some(SampleSetLabelling::DrumkitLabelling(labels)) => ("drumkit".to_string(), {
-                Some(
-                    samples
-                        .iter()
-                        .map(|sample| {
-                            labels.get(sample.uri()).and_then(|label| {
-                                DRUMKIT_LABELS
-                                    .iter()
-                                    .find(|(_s, val)| val == label)
-                                    .map(|(s, _val)| s.to_string())
-                            })
-                        })
-                        .collect(),
-                )
-            }),
-            None => ("none".to_string(), None),
-        };
-
-        let audio_hash = samples
-            .iter()
-            .map(|x| {
-                value.cached_audio_hash_of(x).map(|x| x.to_string()).ok_or(
-                    Error::SerializationError(
-                        "SampleSet missing audio hash for sample".to_string(),
-                    ),
-                )
+                Ok(EntryV1 {
+                    sample: SerSample::try_from_domain(sample)?,
+                    label: match label {
+                        Some(Label::DrumkitLabel(label)) => Some(format!(
+                            "DrumkitLabel.{}",
+                            key_for(label)
+                                .ok_or(Error::SerializationError("Unknown label".to_string()))?
+                        )),
+                        None => None,
+                    },
+                    audio_hash,
+                })
             })
             .collect::<Result<Vec<_>, Error>>()?;
-
-        let samples = samples
-            .iter()
-            .map(crate::serialize::Sample::try_from_domain)
-            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(BaseSampleSetV1 {
             uuid,
             name,
             samples,
-            labelling_kind,
-            labels,
-            audio_hash,
         })
     }
 }
@@ -163,20 +145,20 @@ pub enum SampleSet {
     BaseSampleSetV1(BaseSampleSetV1),
 }
 
-impl TryIntoDomain<crate::samplesets::SampleSet> for SampleSet {
-    fn try_into_domain(self) -> Result<crate::samplesets::SampleSet, Error> {
+impl TryIntoDomain<DomSampleSet> for SampleSet {
+    fn try_into_domain(self) -> Result<DomSampleSet, Error> {
         match self {
-            SampleSet::BaseSampleSetV1(set) => Ok(crate::samplesets::SampleSet::BaseSampleSet(
-                set.try_into_domain()?,
-            )),
+            SampleSet::BaseSampleSetV1(set) => {
+                Ok(DomSampleSet::BaseSampleSet(set.try_into_domain()?))
+            }
         }
     }
 }
 
-impl TryFromDomain<crate::samplesets::SampleSet> for SampleSet {
-    fn try_from_domain(value: &crate::samplesets::SampleSet) -> Result<Self, Error> {
+impl TryFromDomain<DomSampleSet> for SampleSet {
+    fn try_from_domain(value: &DomSampleSet) -> Result<Self, Error> {
         match value {
-            crate::samplesets::SampleSet::BaseSampleSet(set) => Ok(SampleSet::BaseSampleSetV1(
+            DomSampleSet::BaseSampleSet(set) => Ok(SampleSet::BaseSampleSetV1(
                 BaseSampleSetV1::try_from_domain(set)?,
             )),
         }
@@ -186,8 +168,8 @@ impl TryFromDomain<crate::samplesets::SampleSet> for SampleSet {
 #[cfg(test)]
 mod tests {
     use crate::{
-        prelude::{SampleSetLabellingOps, SourceOps},
-        samplesets::{DrumkitLabel, DrumkitLabelling},
+        samplesets::DrumkitLabel,
+        sources::SourceOps,
         testutils::{audiohash_for_test, s},
     };
 
@@ -212,24 +194,14 @@ mod tests {
         let s1 = samples.first().unwrap();
         let s2 = samples.get(1).unwrap();
 
-        let mut set = crate::samplesets::BaseSampleSet::new(s("Favorites"));
+        let mut set = DomBaseSampleSet::new(s("Favorites"));
 
         set.add(&src, s1.clone()).unwrap();
         set.add(&src, s2.clone()).unwrap();
 
-        set.set_labelling(Some(SampleSetLabelling::DrumkitLabelling(
-            DrumkitLabelling::new(),
-        )));
+        set.set_label(s1, DrumkitLabel::CrashCymbal).unwrap();
 
-        match set.labelling_mut() {
-            Some(SampleSetLabelling::DrumkitLabelling(labels)) => {
-                labels.set(s1.uri().clone(), DrumkitLabel::CrashCymbal);
-            }
-            None => panic!(),
-        }
-
-        let serializable =
-            SampleSet::try_from_domain(&crate::samplesets::SampleSet::BaseSampleSet(set)).unwrap();
+        let serializable = SampleSet::try_from_domain(&DomSampleSet::BaseSampleSet(set)).unwrap();
 
         let encoded = serde_json::to_string_pretty(&serializable).unwrap();
         let decoded = serde_json::from_str::<SampleSet>(&encoded).unwrap();
@@ -238,15 +210,8 @@ mod tests {
             SampleSet::BaseSampleSetV1(set) => {
                 assert_eq!(set.name, "Favorites");
                 assert_eq!(set.samples.len(), 2);
-                assert_eq!(set.labels.as_ref().unwrap().len(), 2);
-                assert_eq!(
-                    set.audio_hash.first(),
-                    Some("hashresponse".to_string()).as_ref()
-                );
-                assert_eq!(
-                    set.audio_hash.get(1),
-                    Some("hashresponse".to_string()).as_ref()
-                );
+                assert_eq!(set.samples.first().unwrap().audio_hash, "hashresponse");
+                assert_eq!(set.samples.get(1).unwrap().audio_hash, "hashresponse");
             }
 
             #[allow(unreachable_patterns)]
@@ -256,7 +221,7 @@ mod tests {
         let domained = decoded.try_into_domain().unwrap();
 
         match &domained {
-            crate::samplesets::SampleSet::BaseSampleSet(set) => {
+            DomSampleSet::BaseSampleSet(set) => {
                 assert_eq!(set.name(), "Favorites");
                 assert_eq!(set.len(), 2);
                 assert!(set.contains(s1));
@@ -264,11 +229,8 @@ mod tests {
                 assert_eq!(set.list().len(), 2);
                 assert!(set.list().contains(&s1));
                 assert!(set.list().contains(&s2));
-                assert_eq!(set.labelling().unwrap().len(), 1);
-                assert!(set.labelling().unwrap().contains(s1.uri()));
-                assert!(!set.labelling().unwrap().contains(s2.uri()));
-                assert_eq!(set.cached_audio_hash_of(s1), Some("hashresponse"));
-                assert_eq!(set.cached_audio_hash_of(s2), Some("hashresponse"));
+                assert_eq!(set.cached_audio_hash_of(s1).unwrap(), "hashresponse");
+                assert_eq!(set.cached_audio_hash_of(s2).unwrap(), "hashresponse");
             }
 
             #[allow(unreachable_patterns)]

@@ -4,10 +4,7 @@
 
 use std::cmp::Ordering;
 
-use crate::{
-    prelude::ConcreteSampleSetLabelling,
-    samplesets::{DrumkitLabel, DrumkitLabelling},
-};
+use crate::samplesets::DrumkitLabel;
 
 mod render;
 mod time;
@@ -22,17 +19,14 @@ use uuid::Uuid;
 pub mod drumkit_render_thread;
 
 #[derive(Debug, Clone)]
-pub struct Trigger<T: ConcreteSampleSetLabelling> {
-    label: T::Label,
+pub struct Trigger {
+    label: DrumkitLabel,
     amplitude: f32,
 }
 
-impl<T> Trigger<T>
-where
-    T: ConcreteSampleSetLabelling,
-{
-    pub fn label(&self) -> T::Label {
-        self.label.clone()
+impl Trigger {
+    pub fn label(&self) -> DrumkitLabel {
+        self.label
     }
 
     pub fn amplitude(&self) -> f32 {
@@ -40,40 +34,31 @@ where
     }
 }
 
-impl<T> PartialEq for Trigger<T>
-where
-    T: ConcreteSampleSetLabelling,
-    T::Label: PartialEq,
-{
-    fn eq(&self, other: &Trigger<T>) -> bool {
-        self.label == other.label
+impl PartialEq for Trigger {
+    fn eq(&self, other: &Trigger) -> bool {
+        !(self.label != other.label || self.amplitude != other.amplitude)
     }
 }
 
-impl<T> Eq for Trigger<T>
-where
-    T: ConcreteSampleSetLabelling,
-    T::Label: PartialEq,
-{
-}
+impl Eq for Trigger {}
 
 #[derive(Debug, Clone)]
-pub struct StepInfo<'a, T: ConcreteSampleSetLabelling> {
+pub struct StepInfo<'a> {
     length_in_samples_48k: f64,
-    triggers: &'a Vec<Trigger<T>>,
+    triggers: &'a Vec<Trigger>,
 }
 
-impl<'a, T: ConcreteSampleSetLabelling> StepInfo<'a, T> {
+impl<'a> StepInfo<'a> {
     pub fn length_in_samples(&self, samplerate: Samplerate) -> f64 {
         self.length_in_samples_48k * ((samplerate.get() as f64) / 48000.0)
     }
 
-    pub fn triggers(&self) -> &'a Vec<Trigger<T>> {
+    pub fn triggers(&self) -> &'a Vec<Trigger> {
         self.triggers
     }
 }
 
-pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
+pub trait StepSequenceOps {
     fn name(&self) -> &String;
     fn set_name(&mut self, name: impl Into<String>);
     fn uuid(&self) -> Uuid;
@@ -81,14 +66,14 @@ pub trait StepSequenceOps<T: ConcreteSampleSetLabelling> {
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
     fn step_base_len(&self) -> NoteLength;
-    fn step(&self, n: usize) -> Option<StepInfo<T>>;
+    fn step(&self, n: usize) -> Option<StepInfo>;
     fn set_timespec(&mut self, spec: TimeSpec);
     fn set_len(&mut self, len: usize);
     fn set_step_base_len(&mut self, len: NoteLength);
     fn clear(&mut self);
     fn clear_step(&mut self, n: usize);
-    fn set_step_trigger(&mut self, n: usize, label: T::Label, amp: f32);
-    fn unset_step_trigger(&mut self, n: usize, label: T::Label);
+    fn set_step_trigger(&mut self, n: usize, label: DrumkitLabel, amp: f32);
+    fn unset_step_trigger(&mut self, n: usize, label: DrumkitLabel);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,7 +82,7 @@ pub struct DrumkitSequence {
     name: String,
     timespec: TimeSpec,
     step_base_length: NoteLength,
-    steps: Vec<Vec<Trigger<DrumkitLabelling>>>,
+    steps: Vec<Vec<Trigger>>,
 }
 
 impl DrumkitSequence {
@@ -161,7 +146,7 @@ impl Default for DrumkitSequence {
     }
 }
 
-impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
+impl StepSequenceOps for DrumkitSequence {
     fn name(&self) -> &String {
         &self.name
     }
@@ -190,7 +175,7 @@ impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
         self.step_base_length
     }
 
-    fn step(&self, n: usize) -> Option<StepInfo<DrumkitLabelling>> {
+    fn step(&self, n: usize) -> Option<StepInfo> {
         if let Some(triggers) = self.steps.get(n) {
             let base_len_in_samples = self
                 .timespec
@@ -242,12 +227,7 @@ impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
         }
     }
 
-    fn set_step_trigger(
-        &mut self,
-        n: usize,
-        label: <DrumkitLabelling as ConcreteSampleSetLabelling>::Label,
-        amp: f32,
-    ) {
+    fn set_step_trigger(&mut self, n: usize, label: DrumkitLabel, amp: f32) {
         if let Some(v) = self.steps.get_mut(n) {
             v.retain(|trigger| trigger.label != label);
             v.push(Trigger {
@@ -257,11 +237,7 @@ impl StepSequenceOps<DrumkitLabelling> for DrumkitSequence {
         }
     }
 
-    fn unset_step_trigger(
-        &mut self,
-        n: usize,
-        label: <DrumkitLabelling as ConcreteSampleSetLabelling>::Label,
-    ) {
+    fn unset_step_trigger(&mut self, n: usize, label: DrumkitLabel) {
         if let Some(v) = self.steps.get_mut(n) {
             v.retain(|trigger| trigger.label != label);
         }
@@ -318,10 +294,7 @@ mod tests {
         seq
     }
 
-    fn steps_with_triggers<T>(range: Range<usize>, seq: &impl StepSequenceOps<T>) -> Vec<usize>
-    where
-        T: ConcreteSampleSetLabelling,
-    {
+    fn steps_with_triggers(range: Range<usize>, seq: &impl StepSequenceOps) -> Vec<usize> {
         range
             .into_iter()
             .filter(|n| matches!(seq.step(*n), Some(info) if !info.triggers.is_empty()))

@@ -2,15 +2,17 @@
 //
 // Copyright (c) 2024 Mikael Forsberg (github.com/mkforsb)
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use uuid::Uuid;
 
 use crate::{
     errors::Error,
-    samples::{Sample, SampleOps, SampleURI},
+    samples::{Sample, SampleOps},
     sources::{Source, SourceOps},
 };
+
+pub mod export;
 
 #[cfg(not(test))]
 use crate::audiohash::audio_hash;
@@ -18,9 +20,7 @@ use crate::audiohash::audio_hash;
 #[cfg(test)]
 use crate::testutils::audiohash_for_test::audio_hash;
 
-pub mod export;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DrumkitLabel {
     RimShot,
     Clap,
@@ -40,143 +40,83 @@ pub enum DrumkitLabel {
     Perc4,
 }
 
-pub trait ConcreteSampleSetLabelling {
-    type Label: std::fmt::Debug + Clone;
-
-    fn get(&self, uri: &SampleURI) -> Option<&Self::Label>;
-    fn set(&mut self, uri: SampleURI, label: Self::Label);
+#[derive(Debug, Clone, Copy)]
+pub enum Label {
+    DrumkitLabel(DrumkitLabel),
 }
 
-pub trait SampleSetLabellingOps {
-    fn contains(&self, uri: &SampleURI) -> bool;
-    fn remove(&mut self, uri: &SampleURI) -> Result<(), Error>;
-    fn clear(&mut self);
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
+impl From<DrumkitLabel> for Label {
+    fn from(value: DrumkitLabel) -> Self {
+        Label::DrumkitLabel(value)
+    }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct DrumkitLabelling {
-    labels: HashMap<SampleURI, DrumkitLabel>,
-}
+impl TryFrom<Label> for DrumkitLabel {
+    type Error = Error;
 
-impl DrumkitLabelling {
-    pub fn new() -> Self {
-        DrumkitLabelling {
-            labels: HashMap::new(),
+    fn try_from(value: Label) -> Result<Self, Self::Error> {
+        match value {
+            Label::DrumkitLabel(label) => Ok(label),
         }
     }
 }
 
-impl ConcreteSampleSetLabelling for DrumkitLabelling {
-    type Label = DrumkitLabel;
-
-    fn get(&self, uri: &SampleURI) -> Option<&DrumkitLabel> {
-        self.labels.get(uri)
-    }
-
-    fn set(&mut self, uri: SampleURI, label: DrumkitLabel) {
-        self.labels.insert(uri, label);
-    }
-}
-
-impl SampleSetLabellingOps for DrumkitLabelling {
-    fn contains(&self, uri: &SampleURI) -> bool {
-        self.labels.contains_key(uri)
-    }
-
-    fn clear(&mut self) {
-        self.labels.clear()
-    }
-
-    fn len(&self) -> usize {
-        self.labels.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.labels.is_empty()
-    }
-
-    fn remove(&mut self, uri: &SampleURI) -> Result<(), Error> {
-        self.labels
-            .remove(uri)
-            .ok_or(Error::SampleSetSampleNotPresentError {
-                uri: uri.to_string(),
-            })
-            .map(|_| ())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SampleSetLabelling {
-    DrumkitLabelling(DrumkitLabelling),
-}
-
-impl SampleSetLabellingOps for SampleSetLabelling {
-    fn contains(&self, uri: &SampleURI) -> bool {
-        match self {
-            Self::DrumkitLabelling(kit) => kit.contains(uri),
-        }
-    }
-
-    fn remove(&mut self, uri: &SampleURI) -> Result<(), Error> {
-        match self {
-            Self::DrumkitLabelling(kit) => kit.remove(uri),
-        }
-    }
-
-    fn clear(&mut self) {
-        match self {
-            Self::DrumkitLabelling(kit) => kit.clear(),
-        }
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            Self::DrumkitLabelling(kit) => kit.len(),
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        match self {
-            Self::DrumkitLabelling(kit) => kit.is_empty(),
+impl<T> PartialEq<T> for Label
+where
+    T: Into<Label> + Copy,
+{
+    fn eq(&self, other: &T) -> bool {
+        match (self, <T as Into<Label>>::into(*other)) {
+            (Label::DrumkitLabel(a), Label::DrumkitLabel(b)) => *a == b,
         }
     }
 }
+
+impl Eq for Label {}
 
 pub trait SampleSetOps {
-    fn uuid(&self) -> &Uuid;
+    fn uuid(&self) -> Uuid;
     fn name(&self) -> &str;
     fn list(&self) -> Vec<&Sample>;
-    fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>);
-    fn labelling(&self) -> Option<&SampleSetLabelling>;
-    fn labelling_mut(&mut self) -> Option<&mut SampleSetLabelling>;
     fn add(&mut self, source: &Source, sample: Sample) -> Result<(), Error>;
     fn add_with_hash(&mut self, sample: Sample, hash: String);
     fn remove(&mut self, sample: &Sample) -> Result<(), Error>;
     fn contains(&self, sample: &Sample) -> bool;
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str>;
+    fn cached_audio_hash_of(&self, sample: &Sample) -> Result<&str, Error>;
+
+    fn set_label<T, U>(&mut self, sample: &Sample, label: U) -> Result<(), Error>
+    where
+        T: Into<Label>,
+        U: Into<Option<T>>;
+
+    fn get_label<T>(&self, sample: &Sample) -> Result<Option<T>, Error>
+    where
+        T: TryFrom<Label>;
+
+    fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error>;
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Entry {
+    label: Option<Label>,
+    audio_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseSampleSet {
     uuid: Uuid,
     name: String,
-    samples: HashSet<Sample>,
-    labelling: Option<SampleSetLabelling>,
-    audio_hash: HashMap<SampleURI, String>,
+    samples: HashMap<Sample, Entry>,
 }
 
 impl BaseSampleSet {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<String>) -> BaseSampleSet {
         BaseSampleSet {
             uuid: Uuid::new_v4(),
-            name,
-            samples: HashSet::new(),
-            labelling: None,
-            audio_hash: HashMap::new(),
+            name: name.into(),
+            samples: HashMap::new(),
         }
     }
 
@@ -186,8 +126,8 @@ impl BaseSampleSet {
 }
 
 impl SampleSetOps for BaseSampleSet {
-    fn uuid(&self) -> &Uuid {
-        &self.uuid
+    fn uuid(&self) -> Uuid {
+        self.uuid
     }
 
     fn name(&self) -> &str {
@@ -195,62 +135,46 @@ impl SampleSetOps for BaseSampleSet {
     }
 
     fn list(&self) -> Vec<&Sample> {
-        let mut result = self.samples.iter().collect::<Vec<_>>();
-        result.sort_by(|a: &&Sample, b: &&Sample| a.uri().cmp(b.uri()));
+        let mut result = self.samples.keys().collect::<Vec<_>>();
+        result.sort_by(|a, b| a.uri().cmp(b.uri()));
 
         result
     }
 
-    fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>) {
-        self.labelling = labelling;
-    }
-
-    fn labelling(&self) -> Option<&SampleSetLabelling> {
-        self.labelling.as_ref()
-    }
-
-    fn labelling_mut(&mut self) -> Option<&mut SampleSetLabelling> {
-        self.labelling.as_mut()
-    }
-
     fn add(&mut self, source: &Source, sample: Sample) -> Result<(), Error> {
-        self.audio_hash
-            .insert(sample.uri().clone(), audio_hash(source.stream(&sample)?)?);
-
-        self.samples.insert(sample);
-
+        let audio_hash = audio_hash(source.stream(&sample)?)?;
+        self.samples.insert(
+            sample,
+            Entry {
+                label: None,
+                audio_hash,
+            },
+        );
         Ok(())
     }
 
     fn add_with_hash(&mut self, sample: Sample, hash: String) {
-        self.audio_hash.insert(sample.uri().clone(), hash);
-
-        self.samples.insert(sample);
+        self.samples.insert(
+            sample,
+            Entry {
+                label: None,
+                audio_hash: hash,
+            },
+        );
     }
 
     fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
-        if !self.samples.remove(sample) {
-            assert!(!self.audio_hash.contains_key(sample.uri()));
-            assert!(
-                self.labelling.is_none()
-                    || !self.labelling.as_mut().unwrap().contains(sample.uri())
-            );
-
-            Err(Error::SampleSetSampleNotPresentError {
+        self.samples
+            .remove(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError {
                 uri: sample.uri().to_string(),
-            })
-        } else {
-            self.audio_hash
-                .remove(sample.uri())
-                .expect("Should exist a matching key in audio_hash");
+            })?;
 
-            self.labelling.as_mut().map(|x| x.remove(sample.uri()));
-            Ok(())
-        }
+        Ok(())
     }
 
     fn contains(&self, sample: &Sample) -> bool {
-        self.samples.contains(sample)
+        self.samples.contains_key(sample)
     }
 
     fn len(&self) -> usize {
@@ -261,18 +185,69 @@ impl SampleSetOps for BaseSampleSet {
         self.samples.is_empty()
     }
 
-    fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str> {
-        self.audio_hash.get(sample.uri()).map(|x| x.as_str())
+    fn cached_audio_hash_of(&self, sample: &Sample) -> Result<&str, Error> {
+        self.samples
+            .get(sample)
+            .map(|s| s.audio_hash.as_str())
+            .ok_or(Error::SampleSetSampleNotPresentError {
+                uri: sample.uri().to_string(),
+            })
+    }
+
+    fn set_label<T, U>(&mut self, sample: &Sample, label: U) -> Result<(), Error>
+    where
+        T: Into<Label>,
+        U: Into<Option<T>>,
+    {
+        if self.samples.contains_key(sample) {
+            if let Some(label) = label.into() {
+                self.samples.get_mut(sample).unwrap().label = Some(label.into());
+            } else {
+                self.samples.get_mut(sample).unwrap().label = None;
+            }
+            Ok(())
+        } else {
+            Err(Error::SampleSetSampleNotPresentError {
+                uri: sample.uri().to_string(),
+            })
+        }
+    }
+
+    fn get_label<T>(&self, sample: &Sample) -> Result<Option<T>, Error>
+    where
+        T: TryFrom<Label>,
+    {
+        Ok(self
+            .samples
+            .get(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError {
+                uri: sample.uri().to_string(),
+            })?
+            .label
+            .and_then(|x| x.try_into().ok()))
+    }
+
+    fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error> {
+        Ok(self
+            .samples
+            .get_mut(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError {
+                uri: sample.uri().to_string(),
+            })
+            .is_ok_and(|x| {
+                x.label = None;
+                true
+            }))
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SampleSet {
     BaseSampleSet(BaseSampleSet),
 }
 
 impl SampleSetOps for SampleSet {
-    fn uuid(&self) -> &Uuid {
+    fn uuid(&self) -> Uuid {
         match self {
             Self::BaseSampleSet(set) => set.uuid(),
         }
@@ -287,24 +262,6 @@ impl SampleSetOps for SampleSet {
     fn list(&self) -> Vec<&Sample> {
         match self {
             Self::BaseSampleSet(set) => set.list(),
-        }
-    }
-
-    fn set_labelling(&mut self, labelling: Option<SampleSetLabelling>) {
-        match self {
-            SampleSet::BaseSampleSet(set) => set.set_labelling(labelling),
-        }
-    }
-
-    fn labelling(&self) -> Option<&SampleSetLabelling> {
-        match self {
-            Self::BaseSampleSet(set) => set.labelling(),
-        }
-    }
-
-    fn labelling_mut(&mut self) -> Option<&mut SampleSetLabelling> {
-        match self {
-            Self::BaseSampleSet(set) => set.labelling_mut(),
         }
     }
 
@@ -344,40 +301,67 @@ impl SampleSetOps for SampleSet {
         }
     }
 
-    fn cached_audio_hash_of(&self, sample: &Sample) -> Option<&str> {
+    fn cached_audio_hash_of(&self, sample: &Sample) -> Result<&str, Error> {
         match self {
             Self::BaseSampleSet(set) => set.cached_audio_hash_of(sample),
+        }
+    }
+
+    fn set_label<T, U>(&mut self, sample: &Sample, label: U) -> Result<(), Error>
+    where
+        T: Into<Label>,
+        U: Into<Option<T>>,
+    {
+        match self {
+            Self::BaseSampleSet(set) => set.set_label(sample, label),
+        }
+    }
+
+    fn get_label<T>(&self, sample: &Sample) -> Result<Option<T>, Error>
+    where
+        T: TryFrom<Label>,
+    {
+        match self {
+            Self::BaseSampleSet(set) => set.get_label(sample),
+        }
+    }
+
+    fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error> {
+        match self {
+            Self::BaseSampleSet(set) => set.clear_label(sample),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // TODO: why must `sample` be imported here, but not `fakesource`?
     use crate::testutils::{self, s, sample};
 
     use super::*;
 
     #[test]
     fn test_new_empty() {
-        let mut samples = SampleSet::BaseSampleSet(BaseSampleSet::new(s("My Samples")));
+        let mut samples = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
 
         assert_eq!(samples.name(), "My Samples");
         assert!(samples.list().is_empty());
-        assert!(samples.labelling().is_none());
         assert!(samples.remove(&testutils::sample!()).is_err());
         assert!(!samples.contains(&testutils::sample!()));
-        assert!(samples.is_empty());
         assert!(samples
-            .cached_audio_hash_of(&testutils::sample!())
-            .is_none());
+            .set_label(&testutils::sample!(), DrumkitLabel::BassDrum)
+            .is_err());
+        assert!(samples
+            .get_label::<DrumkitLabel>(&testutils::sample!())
+            .is_err());
+        assert!(samples.is_empty());
+        assert!(samples.cached_audio_hash_of(&testutils::sample!()).is_err());
     }
 
     #[test]
     fn test_add_contains_not_empty_and_hash() {
         testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("My Samples")));
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
 
         assert!(set.add(&source, source.list().unwrap()[0].clone()).is_ok());
@@ -385,8 +369,9 @@ mod tests {
         assert!(!set.is_empty());
 
         assert_eq!(
-            set.cached_audio_hash_of(&source.list().unwrap()[0]),
-            Some("abc123")
+            set.cached_audio_hash_of(&source.list().unwrap()[0])
+                .unwrap(),
+            "abc123"
         );
     }
 
@@ -394,7 +379,7 @@ mod tests {
     fn test_list_sorted_by_uri() {
         testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("My Samples")));
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(
             json = r#"{ "list": [{"uri": "3.wav"}, {"uri": "1.wav"}, {"uri": "2.wav"}] }"#
         );
@@ -413,65 +398,36 @@ mod tests {
     }
 
     #[test]
-    fn test_add_labelling() {
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("My Samples")));
-
-        match &mut set {
-            SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
-                SampleSetLabelling::DrumkitLabelling(DrumkitLabelling::new()),
-            )),
-        }
-
-        assert!(match set.labelling() {
-            Some(SampleSetLabelling::DrumkitLabelling(_)) => true,
-            None => false,
-        })
-    }
-
-    #[test]
     fn test_add_label() {
         testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("My Samples")));
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
+        let sample = &source.list().unwrap()[0];
 
-        set.add(&source, source.list().unwrap()[0].clone()).unwrap();
+        set.add(&source, sample.clone()).unwrap();
 
-        match &mut set {
-            SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
-                SampleSetLabelling::DrumkitLabelling(DrumkitLabelling::new()),
-            )),
-        }
+        assert!(set.set_label(sample, DrumkitLabel::Clap).is_ok());
+        assert!(set.get_label::<DrumkitLabel>(sample).is_ok());
+        assert!(set.get_label::<DrumkitLabel>(sample).unwrap() == Some(DrumkitLabel::Clap));
 
-        assert!(!set
-            .labelling()
-            .unwrap()
-            .contains(source.list().unwrap()[0].uri()));
+        assert!(matches!(
+            set.get_label::<Label>(sample).unwrap(),
+            Some(Label::DrumkitLabel(DrumkitLabel::Clap))
+        ));
 
-        if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
-            labels.set(source.list().unwrap()[0].uri().clone(), DrumkitLabel::Clap);
-        }
+        assert!(set.set_label(sample, DrumkitLabel::MidTom).is_ok());
+        assert!(set.get_label::<DrumkitLabel>(sample).unwrap() == Some(DrumkitLabel::MidTom));
 
-        assert!(set
-            .labelling()
-            .unwrap()
-            .contains(source.list().unwrap()[0].uri()));
-
-        assert_eq!(
-            match set.labelling() {
-                Some(SampleSetLabelling::DrumkitLabelling(labels)) =>
-                    labels.get(source.list().unwrap()[0].uri()),
-                None => None,
-            },
-            Some(DrumkitLabel::Clap).as_ref()
-        );
+        assert!(set.set_label::<Label, Option<Label>>(sample, None).is_ok());
+        assert!(set.get_label::<DrumkitLabel>(sample).unwrap().is_none());
     }
 
     #[test]
     fn test_remove() {
         testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("My Samples")));
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
 
         set.add(&source, source.list().unwrap()[0].clone()).unwrap();
@@ -484,30 +440,15 @@ mod tests {
     fn test_remove_leads_to_hash_and_label_removed() {
         testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("My Samples")));
+        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
+        let sample = &source.list().unwrap()[0];
 
-        set.add(&source, source.list().unwrap()[0].clone()).unwrap();
-
-        match &mut set {
-            SampleSet::BaseSampleSet(bss) => bss.set_labelling(Some(
-                SampleSetLabelling::DrumkitLabelling(DrumkitLabelling::new()),
-            )),
-        }
-
-        if let Some(SampleSetLabelling::DrumkitLabelling(labels)) = set.labelling_mut() {
-            labels.set(source.list().unwrap()[0].uri().clone(), DrumkitLabel::Clap);
-        }
-
+        set.add(&source, sample.clone()).unwrap();
+        set.set_label(sample, DrumkitLabel::Clap).unwrap();
         set.remove(&source.list().unwrap()[0]).unwrap();
 
-        assert!(set
-            .cached_audio_hash_of(&source.list().unwrap()[0])
-            .is_none());
-
-        assert!(!set
-            .labelling()
-            .unwrap()
-            .contains(source.list().unwrap()[0].uri()));
+        assert!(set.cached_audio_hash_of(sample).is_err());
+        assert!(set.get_label::<Label>(sample).is_err());
     }
 }
