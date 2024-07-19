@@ -113,7 +113,7 @@ macro_rules! sample {
     };
 
     (json=$json:expr) => {
-        sample_from_json(&json::parse($json).unwrap())
+        $crate::testutils::sample_from_json(&json::parse($json).unwrap())
     };
 }
 
@@ -243,7 +243,7 @@ macro_rules! fakesource {
     };
 
     (json=$json:expr) => {
-        fakesource_from_json(&json::parse($json).unwrap())
+        $crate::testutils::fakesource_from_json(&json::parse($json).unwrap())
     };
 }
 

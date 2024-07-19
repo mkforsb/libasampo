@@ -363,7 +363,7 @@ mod tests {
 
     use crate::{
         samplesets::BaseSampleSet,
-        testutils::{self, fakesource_from_json, s},
+        testutils::{self, s},
     };
 
     use super::*;

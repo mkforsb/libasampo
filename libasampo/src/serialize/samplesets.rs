@@ -197,7 +197,7 @@ mod tests {
     fn test_basesampleset() {
         audiohash_for_test::RESULT.set(Some(|_| Ok("hashresponse".to_string())));
 
-        use crate::testutils::{fakesource, fakesource_from_json};
+        use crate::testutils::fakesource;
 
         let src = fakesource!(
             json = r#"{
