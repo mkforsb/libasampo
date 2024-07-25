@@ -73,7 +73,6 @@ impl DrumkitSampleLoader for SampleSetSampleLoader {
 
 mod dksrender {
     use std::{
-        collections::HashSet,
         rc::Rc,
         sync::mpsc::{channel, Receiver, TryRecvError},
         time::{Duration, Instant},
@@ -524,17 +523,29 @@ mod dksrender {
         }
 
         fn unload_stale_samples(&mut self) {
-            let active_generations = self
+            let num_stale_gens = if let Some(earliest_active_generation) = self
                 .active_sounds
                 .iter()
                 .map(|x| x.samples_generation)
-                .collect::<HashSet<_>>();
+                .min()
+            {
+                earliest_active_generation
+            } else {
+                self.samples_current_generation
+            };
 
-            for (index, cache) in self.samples.iter_mut().enumerate() {
-                if index < self.samples_current_generation && !active_generations.contains(&index) {
-                    log::log!(log::Level::Debug, "Unloading samples generation {index}");
-                    cache.clear();
-                }
+            if num_stale_gens > 0 {
+                self.samples.drain(0..num_stale_gens);
+                self.samples_current_generation -= num_stale_gens;
+
+                self.active_sounds
+                    .iter_mut()
+                    .for_each(|s| s.samples_generation -= num_stale_gens);
+
+                log::log!(
+                    log::Level::Debug,
+                    "Dropped {num_stale_gens} sample generation(s)"
+                );
             }
         }
 
@@ -599,7 +610,7 @@ mod dksrender {
             let mut dksr = DrumkitSequenceRenderer::new(44100.try_into().unwrap());
 
             load_samples(&mut dksr);
-            assert_eq!(dksr.samples[1].len(), 1);
+            assert_eq!(dksr.samples.len(), 2);
 
             dksr.active_sounds.push(ActiveSound {
                 label: DrumkitLabel::BassDrum,
@@ -610,14 +621,16 @@ mod dksrender {
             });
 
             load_samples(&mut dksr);
+            assert_eq!(dksr.samples.len(), 3);
             dksr.unload_stale_samples();
-            assert_eq!(dksr.samples[1].len(), 1);
+            assert_eq!(dksr.samples.len(), 2);
 
             dksr.active_sounds.clear();
             dksr.unload_stale_samples();
-            assert_eq!(dksr.samples[1].len(), 0);
+            assert_eq!(dksr.samples.len(), 1);
         }
 
+        /// Test unloading of stale sample generations triggered by async sample loaders.
         #[test]
         fn test_unload_stale_samples_async() {
             fn load_samples(dksr: &mut DrumkitSequenceRenderer) {
@@ -635,7 +648,7 @@ mod dksrender {
             let mut dksr = DrumkitSequenceRenderer::new(44100.try_into().unwrap());
 
             load_samples(&mut dksr);
-            assert_eq!(dksr.samples[1].len(), 1);
+            assert_eq!(dksr.samples.len(), 1);
 
             dksr.active_sounds.push(ActiveSound {
                 label: DrumkitLabel::BassDrum,
@@ -647,11 +660,11 @@ mod dksrender {
 
             load_samples(&mut dksr);
             dksr.unload_stale_samples();
-            assert_eq!(dksr.samples[1].len(), 1);
+            assert_eq!(dksr.samples.len(), 2);
 
             dksr.active_sounds.clear();
             dksr.unload_stale_samples();
-            assert_eq!(dksr.samples[1].len(), 0);
+            assert_eq!(dksr.samples.len(), 1);
         }
     }
 }
