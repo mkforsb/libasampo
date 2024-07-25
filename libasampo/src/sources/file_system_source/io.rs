@@ -126,8 +126,10 @@ impl IO for DefaultIO {
                     // TODO: better way o indicating "unknown" channel count.
                     channels: codec_params.channels.map_or(0, |ch| ch.count() as u8),
 
-                    // TODO: implement properly
-                    src_fmt_display: "readable format info".to_string(),
+                    src_fmt_display: symphonia::default::get_codecs()
+                        .get_codec(codec_params.codec)
+                        .map(|c| c.long_name.to_string())
+                        .unwrap_or("Unknown".to_string()),
 
                     size_bytes: {
                         File::open(path).map_or(None, |mut fd| fd.seek(SeekFrom::End(0)).ok())
