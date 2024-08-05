@@ -71,7 +71,7 @@ impl State {
             .map_err(|e| Error::ChannelError(e.to_string()))?;
 
         let output_spec = spec_rx
-            .recv_timeout(std::time::Duration::from_secs(1))
+            .recv_timeout(std::time::Duration::from_secs(10))
             .map_err(|e| Error::ChannelError(e.to_string()))?;
 
         log::log!(log::Level::Debug, "Output spec: {:?}", output_spec);
