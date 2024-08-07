@@ -96,7 +96,21 @@ where
     T: IO,
 {
     fn eq(&self, other: &Self) -> bool {
-        (&self.name, &self.path, &self.uuid) == (&other.name, &other.path, &other.uuid)
+        (
+            &self.name,
+            &self.uuid,
+            &self.path,
+            &self.uri,
+            &self.exts,
+            &self.enabled,
+        ) == (
+            &other.name,
+            &other.uuid,
+            &other.path,
+            &other.uri,
+            &other.exts,
+            &other.enabled,
+        )
     }
 }
 
