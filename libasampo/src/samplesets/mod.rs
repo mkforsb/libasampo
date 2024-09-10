@@ -95,6 +95,7 @@ pub trait SampleSetOps {
     where
         T: TryFrom<Label>;
 
+    // TODO: what is the point of the `bool` value?
     fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error>;
 }
 
@@ -241,69 +242,223 @@ impl SampleSetOps for BaseSampleSet {
     }
 }
 
+#[cfg(any(test, feature = "fakes"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FakeSampleSet {
+    pub uuid: Uuid,
+    pub name: String,
+    pub samples: HashMap<Sample, FakeEntry>,
+}
+
+#[cfg(any(test, feature = "fakes"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FakeEntry {
+    pub label: Option<Label>,
+    pub audio_hash: String,
+}
+
+#[cfg(any(test, feature = "fakes"))]
+impl SampleSetOps for FakeSampleSet {
+    fn uuid(&self) -> Uuid {
+        self.uuid
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn list(&self) -> Vec<&Sample> {
+        self.samples.keys().collect()
+    }
+
+    fn add(&mut self, _source: &Source, sample: Sample) -> Result<(), Error> {
+        self.samples.insert(
+            sample,
+            FakeEntry {
+                label: None,
+                audio_hash: String::from(""),
+            },
+        );
+
+        Ok(())
+    }
+
+    fn add_with_hash(&mut self, sample: Sample, hash: String) {
+        self.samples.insert(
+            sample,
+            FakeEntry {
+                label: None,
+                audio_hash: hash,
+            },
+        );
+    }
+
+    fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
+        let uri = sample.uri().to_string();
+        self.samples
+            .remove(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError { uri })?;
+        Ok(())
+    }
+
+    fn contains(&self, sample: &Sample) -> bool {
+        self.samples.contains_key(sample)
+    }
+
+    fn len(&self) -> usize {
+        self.samples.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.samples.is_empty()
+    }
+
+    fn cached_audio_hash_of(&self, sample: &Sample) -> Result<&str, Error> {
+        let uri = sample.uri().to_string();
+        Ok(self
+            .samples
+            .get(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError { uri })?
+            .audio_hash
+            .as_str())
+    }
+
+    fn set_label<T, U>(&mut self, sample: &Sample, label: U) -> Result<(), Error>
+    where
+        T: Into<Label>,
+        U: Into<Option<T>>,
+    {
+        let uri = sample.uri().to_string();
+        self.samples
+            .get_mut(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError { uri })?
+            .label = label.into().map(|label| label.into());
+        Ok(())
+    }
+
+    fn get_label<T>(&self, sample: &Sample) -> Result<Option<T>, Error>
+    where
+        T: TryFrom<Label>,
+    {
+        let uri = sample.uri().to_string();
+        match self
+            .samples
+            .get(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError { uri })?
+            .label
+        {
+            Some(label) => Ok(label.try_into().ok()),
+            None => Ok(None),
+        }
+    }
+
+    fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error> {
+        let uri = sample.uri().to_string();
+        self.samples
+            .get_mut(sample)
+            .ok_or(Error::SampleSetSampleNotPresentError { uri })?
+            .label = None;
+
+        Ok(true)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SampleSet {
     BaseSampleSet(BaseSampleSet),
+
+    #[cfg(any(test, feature = "fakes"))]
+    FakeSampleSet(FakeSampleSet),
 }
 
 impl SampleSetOps for SampleSet {
     fn uuid(&self) -> Uuid {
         match self {
             Self::BaseSampleSet(set) => set.uuid(),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.uuid(),
         }
     }
 
     fn name(&self) -> &str {
         match self {
             Self::BaseSampleSet(set) => set.name(),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.name(),
         }
     }
 
     fn list(&self) -> Vec<&Sample> {
         match self {
             Self::BaseSampleSet(set) => set.list(),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.list(),
         }
     }
 
     fn add(&mut self, source: &Source, sample: Sample) -> Result<(), Error> {
         match self {
             Self::BaseSampleSet(set) => set.add(source, sample),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.add(source, sample),
         }
     }
 
     fn add_with_hash(&mut self, sample: Sample, hash: String) {
         match self {
             Self::BaseSampleSet(set) => set.add_with_hash(sample, hash),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.add_with_hash(sample, hash),
         }
     }
 
     fn remove(&mut self, sample: &Sample) -> Result<(), Error> {
         match self {
             Self::BaseSampleSet(set) => set.remove(sample),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.remove(sample),
         }
     }
 
     fn contains(&self, sample: &Sample) -> bool {
         match self {
             Self::BaseSampleSet(set) => set.contains(sample),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.contains(sample),
         }
     }
 
     fn len(&self) -> usize {
         match self {
             Self::BaseSampleSet(set) => set.len(),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.len(),
         }
     }
 
     fn is_empty(&self) -> bool {
         match self {
             Self::BaseSampleSet(set) => set.is_empty(),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.is_empty(),
         }
     }
 
     fn cached_audio_hash_of(&self, sample: &Sample) -> Result<&str, Error> {
         match self {
             Self::BaseSampleSet(set) => set.cached_audio_hash_of(sample),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.cached_audio_hash_of(sample),
         }
     }
 
@@ -314,6 +469,9 @@ impl SampleSetOps for SampleSet {
     {
         match self {
             Self::BaseSampleSet(set) => set.set_label(sample, label),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.set_label(sample, label),
         }
     }
 
@@ -323,12 +481,18 @@ impl SampleSetOps for SampleSet {
     {
         match self {
             Self::BaseSampleSet(set) => set.get_label(sample),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.get_label(sample),
         }
     }
 
     fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error> {
         match self {
             Self::BaseSampleSet(set) => set.clear_label(sample),
+
+            #[cfg(any(test, feature = "fakes"))]
+            Self::FakeSampleSet(set) => set.clear_label(sample),
         }
     }
 }

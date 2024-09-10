@@ -161,6 +161,11 @@ impl TryFromDomain<DomSampleSet> for SampleSet {
             DomSampleSet::BaseSampleSet(set) => Ok(SampleSet::BaseSampleSetV1(
                 BaseSampleSetV1::try_from_domain(set)?,
             )),
+
+            #[cfg(any(test, feature = "fakes"))]
+            DomSampleSet::FakeSampleSet(..) => {
+                panic!("serializing `FakeSampleSet` is not supported")
+            }
         }
     }
 }
