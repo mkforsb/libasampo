@@ -26,6 +26,7 @@ pub(crate) trait SourceOps {
     fn mix_to_same_spec(&mut self, buffer: &mut [f32]);
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) struct FakeSource {
     spec: AudioSpec,
@@ -34,6 +35,7 @@ pub(crate) struct FakeSource {
     read_frame_offset: usize,
 }
 
+#[cfg(test)]
 impl SourceOps for FakeSource {
     fn spec(&self) -> AudioSpec {
         self.spec
@@ -70,8 +72,8 @@ impl SourceOps for FakeSource {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 pub(crate) enum Source {
+    #[expect(dead_code)]
     #[cfg(test)]
-    #[allow(dead_code)]
     FakeSource(FakeSource),
 
     SymphoniaSource(SymphoniaSource),
