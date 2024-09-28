@@ -74,6 +74,9 @@ pub trait StepSequenceOps {
     fn clear_step(&mut self, n: usize);
     fn set_step_trigger(&mut self, n: usize, label: DrumkitLabel, amp: f32);
     fn unset_step_trigger(&mut self, n: usize, label: DrumkitLabel);
+
+    #[cfg(any(test, feature = "testables"))]
+    fn set_uuid(&mut self, uuid: Uuid);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,7 +128,13 @@ impl DrumkitSequence {
         }
     }
 
+    #[cfg(not(any(test, feature = "testables")))]
     pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
+        self.uuid = uuid;
+    }
+
+    #[cfg(any(test, feature = "testables"))]
+    pub fn set_uuid(&mut self, uuid: Uuid) {
         self.uuid = uuid;
     }
 
@@ -241,6 +250,11 @@ impl StepSequenceOps for DrumkitSequence {
         if let Some(v) = self.steps.get_mut(n) {
             v.retain(|trigger| trigger.label != label);
         }
+    }
+
+    #[cfg(any(test, feature = "testables"))]
+    fn set_uuid(&mut self, uuid: Uuid) {
+        self.uuid = uuid;
     }
 }
 

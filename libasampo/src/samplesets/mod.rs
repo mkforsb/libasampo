@@ -97,6 +97,9 @@ pub trait SampleSetOps {
 
     // TODO: what is the point of the `bool` value?
     fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error>;
+
+    #[cfg(any(test, feature = "testables"))]
+    fn set_uuid(&mut self, uuid: Uuid);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -240,6 +243,11 @@ impl SampleSetOps for BaseSampleSet {
                 true
             }))
     }
+
+    #[cfg(any(test, feature = "testables"))]
+    fn set_uuid(&mut self, uuid: Uuid) {
+        self.uuid = uuid;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -330,6 +338,13 @@ impl SampleSetOps for SampleSet {
     fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error> {
         match self {
             Self::BaseSampleSet(set) => set.clear_label(sample),
+        }
+    }
+
+    #[cfg(any(test, feature = "testables"))]
+    fn set_uuid(&mut self, uuid: Uuid) {
+        match self {
+            Self::BaseSampleSet(set) => set.set_uuid(uuid),
         }
     }
 }

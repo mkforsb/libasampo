@@ -10,6 +10,7 @@ ignored = ["md-5"]
 audiothread-integration = ["dep:audiothread"]
 fakes = []
 mocks = ["dep:mockall"]
+testables = []
 wav-output-tests = []
 
 [dev-dependencies]
