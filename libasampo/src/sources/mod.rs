@@ -249,7 +249,15 @@ impl SourceOps for Source {
             Self::MockSource(src) => src.list_async(tx),
 
             #[cfg(any(test, feature = "fakes"))]
-            Self::FakeSource(_src) => unimplemented!(),
+            Self::FakeSource(src) => {
+                src.list
+                    .iter()
+                    .cloned()
+                    .for_each(|sample| match tx.send(Ok(sample)) {
+                        Ok(_) => (),
+                        Err(e) => eprintln!("{e}"),
+                    })
+            }
         }
     }
 
