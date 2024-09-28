@@ -148,7 +148,7 @@ mockall::mock! {
 }
 
 #[cfg(any(test, feature = "fakes"))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct FakeSource {
     pub name: Option<String>,
     pub uri: String,
@@ -158,6 +158,24 @@ pub struct FakeSource {
     pub stream: HashMap<SampleURI, Vec<f32>>,
     pub stream_error: Option<fn() -> Error>,
     pub enabled: bool,
+}
+
+// Implemented manually because fuzzing/proptesting can generate NaN for f32 which
+// can lead to .stream != .stream since NaN != NaN.
+#[cfg(any(test, feature = "fakes"))]
+impl PartialEq for FakeSource {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.uri == other.uri
+            && self.uuid == other.uuid
+            && self.list == other.list
+            && self.enabled == other.enabled
+            && self.stream.keys().collect::<Vec<_>>() == other.stream.keys().collect::<Vec<_>>()
+            && ((self.list_error.is_none() && other.list_error.is_none())
+                || (self.list_error.is_some() && other.list_error.is_some()))
+            && ((self.stream_error.is_none() && other.stream_error.is_none())
+                || (self.stream_error.is_some() && other.stream_error.is_some()))
+    }
 }
 
 // TODO: use enum-dispatch
