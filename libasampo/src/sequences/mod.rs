@@ -25,6 +25,10 @@ pub struct Trigger {
 }
 
 impl Trigger {
+    pub fn new(label: DrumkitLabel, amplitude: f32) -> Trigger {
+        Trigger { label, amplitude }
+    }
+
     pub fn label(&self) -> DrumkitLabel {
         self.label
     }
@@ -49,6 +53,13 @@ pub struct StepInfo<'a> {
 }
 
 impl<'a> StepInfo<'a> {
+    pub fn new(length_in_samples_48k: f64, triggers: &'a Vec<Trigger>) -> StepInfo<'a> {
+        StepInfo {
+            length_in_samples_48k,
+            triggers,
+        }
+    }
+
     pub fn length_in_samples(&self, samplerate: Samplerate) -> f64 {
         self.length_in_samples_48k * ((samplerate.get() as f64) / 48000.0)
     }
