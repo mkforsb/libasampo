@@ -7,18 +7,13 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{
+    audiohash::{AudioHasher, Md5AudioHasher},
     errors::Error,
     samples::{Sample, SampleOps},
     sources::{Source, SourceOps},
 };
 
 pub mod export;
-
-#[cfg(not(test))]
-use crate::audiohash::audio_hash;
-
-#[cfg(test)]
-use crate::testutils::audiohash_for_test::audio_hash;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DrumkitLabel {
@@ -105,27 +100,40 @@ struct Entry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BaseSampleSet {
+pub struct BaseSampleSet<H: AudioHasher = Md5AudioHasher> {
     uuid: Uuid,
     name: String,
     samples: HashMap<Sample, Entry>,
+    _phantom: std::marker::PhantomData<H>,
 }
 
 impl BaseSampleSet {
     pub fn new(name: impl Into<String>) -> BaseSampleSet {
+        Self::new_with_hasher::<Md5AudioHasher>(name)
+    }
+
+    pub fn new_with_hasher<H>(name: impl Into<String>) -> BaseSampleSet<H>
+    where
+        H: AudioHasher,
+    {
         BaseSampleSet {
             uuid: Uuid::new_v4(),
             name: name.into(),
             samples: HashMap::new(),
+            _phantom: std::marker::PhantomData,
         }
     }
 
+    /// Used in deserialization
     pub(crate) fn set_uuid(&mut self, uuid: Uuid) {
         self.uuid = uuid;
     }
 }
 
-impl SampleSetOps for BaseSampleSet {
+impl<H> SampleSetOps for BaseSampleSet<H>
+where
+    H: AudioHasher,
+{
     fn uuid(&self) -> Uuid {
         self.uuid
     }
@@ -142,7 +150,7 @@ impl SampleSetOps for BaseSampleSet {
     }
 
     fn add(&mut self, source: &Source, sample: Sample) -> Result<(), Error> {
-        let audio_hash = audio_hash(source.stream(&sample)?)?;
+        let audio_hash = H::audio_hash(source.stream(&sample)?)?;
         self.samples.insert(
             sample,
             Entry {
@@ -229,11 +237,14 @@ impl SampleSetOps for BaseSampleSet {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SampleSet {
-    BaseSampleSet(BaseSampleSet),
+pub enum SampleSet<H: AudioHasher = Md5AudioHasher> {
+    BaseSampleSet(BaseSampleSet<H>),
 }
 
-impl SampleSetOps for SampleSet {
+impl<H> SampleSetOps for SampleSet<H>
+where
+    H: AudioHasher,
+{
     fn uuid(&self) -> Uuid {
         match self {
             Self::BaseSampleSet(set) => set.uuid(),
@@ -322,9 +333,17 @@ impl SampleSetOps for SampleSet {
 
 #[cfg(test)]
 mod tests {
-    use crate::testutils::{self, s, sample};
+    use crate::testutils::{self, sample};
 
     use super::*;
+
+    struct DummyHasher;
+
+    impl AudioHasher for DummyHasher {
+        fn audio_hash(_reader: crate::sources::SourceReader) -> Result<String, Error> {
+            Ok("abc123".to_string())
+        }
+    }
 
     #[test]
     fn test_new_empty() {
@@ -346,9 +365,9 @@ mod tests {
 
     #[test]
     fn test_add_contains_not_empty_and_hash() {
-        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
+        let mut set =
+            SampleSet::BaseSampleSet(BaseSampleSet::new_with_hasher::<DummyHasher>("My Samples"));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
 
         assert!(set.add(&source, source.list().unwrap()[0].clone()).is_ok());
@@ -364,9 +383,9 @@ mod tests {
 
     #[test]
     fn test_list_sorted_by_uri() {
-        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
+        let mut set =
+            SampleSet::BaseSampleSet(BaseSampleSet::new_with_hasher::<DummyHasher>("My Samples"));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(
             json = r#"{ "list": [{"uri": "3.wav"}, {"uri": "1.wav"}, {"uri": "2.wav"}] }"#
         );
@@ -386,9 +405,9 @@ mod tests {
 
     #[test]
     fn test_add_label() {
-        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
+        let mut set =
+            SampleSet::BaseSampleSet(BaseSampleSet::new_with_hasher::<DummyHasher>("My Samples"));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
         let sample = &source.list().unwrap()[0];
 
@@ -412,9 +431,9 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
+        let mut set =
+            SampleSet::BaseSampleSet(BaseSampleSet::new_with_hasher::<DummyHasher>("My Samples"));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
 
         set.add(&source, source.list().unwrap()[0].clone()).unwrap();
@@ -425,9 +444,9 @@ mod tests {
 
     #[test]
     fn test_remove_leads_to_hash_and_label_removed() {
-        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s("abc123"))));
+        let mut set =
+            SampleSet::BaseSampleSet(BaseSampleSet::new_with_hasher::<DummyHasher>("My Samples"));
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new("My Samples"));
         let source = testutils::fakesource!(json = r#"{ "list": [{"uri": "1.wav"}] }"#);
         let sample = &source.list().unwrap()[0];
 

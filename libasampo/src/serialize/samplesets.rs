@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    audiohash::AudioHasher,
     errors::Error,
     samplesets::{
         BaseSampleSet as DomBaseSampleSet, DrumkitLabel, Label, SampleSet as DomSampleSet,
@@ -106,8 +107,11 @@ impl TryIntoDomain<DomBaseSampleSet> for BaseSampleSetV1 {
     }
 }
 
-impl TryFromDomain<DomBaseSampleSet> for BaseSampleSetV1 {
-    fn try_from_domain(set: &DomBaseSampleSet) -> Result<Self, Error> {
+impl<H> TryFromDomain<DomBaseSampleSet<H>> for BaseSampleSetV1
+where
+    H: AudioHasher,
+{
+    fn try_from_domain(set: &DomBaseSampleSet<H>) -> Result<Self, Error> {
         let uuid = set.uuid();
         let name = set.name().to_string();
         let samples = set
@@ -155,8 +159,11 @@ impl TryIntoDomain<DomSampleSet> for SampleSet {
     }
 }
 
-impl TryFromDomain<DomSampleSet> for SampleSet {
-    fn try_from_domain(value: &DomSampleSet) -> Result<Self, Error> {
+impl<H> TryFromDomain<DomSampleSet<H>> for SampleSet
+where
+    H: AudioHasher,
+{
+    fn try_from_domain(value: &DomSampleSet<H>) -> Result<Self, Error> {
         match value {
             DomSampleSet::BaseSampleSet(set) => Ok(SampleSet::BaseSampleSetV1(
                 BaseSampleSetV1::try_from_domain(set)?,
@@ -168,18 +175,20 @@ impl TryFromDomain<DomSampleSet> for SampleSet {
 #[cfg(test)]
 mod tests {
     use crate::{
-        samplesets::DrumkitLabel,
-        sources::SourceOps,
-        testutils::{audiohash_for_test, s},
+        audiohash::AudioHasher, samplesets::DrumkitLabel, sources::SourceOps, testutils::fakesource,
     };
 
     use super::*;
 
     #[test]
     fn test_basesampleset() {
-        audiohash_for_test::RESULT.set(Some(|_| Ok("hashresponse".to_string())));
+        struct DummyHasher;
 
-        use crate::testutils::fakesource;
+        impl AudioHasher for DummyHasher {
+            fn audio_hash(_reader: crate::sources::SourceReader) -> Result<String, Error> {
+                Ok("hashresponse".to_string())
+            }
+        }
 
         let src = fakesource!(
             json = r#"{
@@ -194,7 +203,7 @@ mod tests {
         let s1 = samples.first().unwrap();
         let s2 = samples.get(1).unwrap();
 
-        let mut set = DomBaseSampleSet::new(s("Favorites"));
+        let mut set = DomBaseSampleSet::new_with_hasher::<DummyHasher>("Favorites");
 
         set.add(&src, s1.clone()).unwrap();
         set.add(&src, s2.clone()).unwrap();

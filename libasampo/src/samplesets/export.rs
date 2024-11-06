@@ -14,6 +14,7 @@ use rayon_progress::ProgressAdaptor;
 use uuid::Uuid;
 
 use crate::{
+    audiohash::AudioHasher,
     convert::{convert, decode, ChannelMapping, RateConversion},
     errors::Error,
     prelude::{SampleOps, SourceOps},
@@ -157,12 +158,14 @@ impl<T> ExportJob<T>
 where
     T: IO + 'static,
 {
-    pub fn perform(
+    pub fn perform<H>(
         &self,
-        sampleset: &SampleSet,
+        sampleset: &SampleSet<H>,
         sources: &HashMap<Uuid, Source>,
         tx: Option<std::sync::mpsc::Sender<ExportJobMessage>>,
-    ) {
+    ) where
+        H: AudioHasher,
+    {
         macro_rules! send_or_log {
             ($tx:ident, $msg:expr) => {{
                 let _ = $tx.send($msg).inspect_err(|e| {
@@ -361,10 +364,7 @@ where
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crate::{
-        samplesets::BaseSampleSet,
-        testutils::{self, s},
-    };
+    use crate::{samplesets::BaseSampleSet, testutils};
 
     use super::*;
 
@@ -425,7 +425,13 @@ mod tests {
 
     #[test]
     fn test_plain_copy() {
-        testutils::audiohash_for_test::RESULT.set(Some(|_| Ok(s(""))));
+        struct DummyHasher;
+
+        impl AudioHasher for DummyHasher {
+            fn audio_hash(_reader: crate::sources::SourceReader) -> Result<String, Error> {
+                Ok("".to_string())
+            }
+        }
 
         let source = testutils::fakesource!(
             json = r#"{
@@ -439,7 +445,8 @@ mod tests {
         let s1 = samples.first().unwrap();
         let s2 = samples.get(1).unwrap();
 
-        let mut set = SampleSet::BaseSampleSet(BaseSampleSet::new(s("Favorites")));
+        let mut set =
+            SampleSet::BaseSampleSet(BaseSampleSet::new_with_hasher::<DummyHasher>("Favorites"));
 
         set.add(&source, s1.clone()).unwrap();
         set.add(&source, s2.clone()).unwrap();
