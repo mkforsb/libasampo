@@ -86,17 +86,13 @@ pub trait SampleSetOps {
     fn is_empty(&self) -> bool;
     fn cached_audio_hash_of(&self, sample: &Sample) -> Result<&str, Error>;
 
-    fn set_label<T, U>(&mut self, sample: &Sample, label: U) -> Result<(), Error>
+    fn set_label<T>(&mut self, sample: &Sample, label: Option<T>) -> Result<(), Error>
     where
-        T: Into<Label>,
-        U: Into<Option<T>>;
+        T: Into<Label>;
 
     fn get_label<T>(&self, sample: &Sample) -> Result<Option<T>, Error>
     where
         T: TryFrom<Label>;
-
-    // TODO: what is the point of the `bool` value?
-    fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error>;
 
     #[cfg(any(test, feature = "testables"))]
     fn set_uuid(&mut self, uuid: Uuid);
@@ -198,17 +194,12 @@ impl SampleSetOps for BaseSampleSet {
             })
     }
 
-    fn set_label<T, U>(&mut self, sample: &Sample, label: U) -> Result<(), Error>
+    fn set_label<T>(&mut self, sample: &Sample, label: Option<T>) -> Result<(), Error>
     where
         T: Into<Label>,
-        U: Into<Option<T>>,
     {
         if self.samples.contains_key(sample) {
-            if let Some(label) = label.into() {
-                self.samples.get_mut(sample).unwrap().label = Some(label.into());
-            } else {
-                self.samples.get_mut(sample).unwrap().label = None;
-            }
+            self.samples.get_mut(sample).unwrap().label = label.map(Into::into);
             Ok(())
         } else {
             Err(Error::SampleSetSampleNotPresentError {
@@ -229,19 +220,6 @@ impl SampleSetOps for BaseSampleSet {
             })?
             .label
             .and_then(|x| x.try_into().ok()))
-    }
-
-    fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error> {
-        Ok(self
-            .samples
-            .get_mut(sample)
-            .ok_or(Error::SampleSetSampleNotPresentError {
-                uri: sample.uri().to_string(),
-            })
-            .is_ok_and(|x| {
-                x.label = None;
-                true
-            }))
     }
 
     #[cfg(any(test, feature = "testables"))]
@@ -316,10 +294,9 @@ impl SampleSetOps for SampleSet {
         }
     }
 
-    fn set_label<T, U>(&mut self, sample: &Sample, label: U) -> Result<(), Error>
+    fn set_label<T>(&mut self, sample: &Sample, label: Option<T>) -> Result<(), Error>
     where
         T: Into<Label>,
-        U: Into<Option<T>>,
     {
         match self {
             Self::BaseSampleSet(set) => set.set_label(sample, label),
@@ -332,12 +309,6 @@ impl SampleSetOps for SampleSet {
     {
         match self {
             Self::BaseSampleSet(set) => set.get_label(sample),
-        }
-    }
-
-    fn clear_label(&mut self, sample: &Sample) -> Result<bool, Error> {
-        match self {
-            Self::BaseSampleSet(set) => set.clear_label(sample),
         }
     }
 
@@ -364,7 +335,7 @@ mod tests {
         assert!(samples.remove(&testutils::sample!()).is_err());
         assert!(!samples.contains(&testutils::sample!()));
         assert!(samples
-            .set_label(&testutils::sample!(), DrumkitLabel::BassDrum)
+            .set_label(&testutils::sample!(), Some(DrumkitLabel::BassDrum))
             .is_err());
         assert!(samples
             .get_label::<DrumkitLabel>(&testutils::sample!())
@@ -423,7 +394,7 @@ mod tests {
 
         set.add(&source, sample.clone()).unwrap();
 
-        assert!(set.set_label(sample, DrumkitLabel::Clap).is_ok());
+        assert!(set.set_label(sample, Some(DrumkitLabel::Clap)).is_ok());
         assert!(set.get_label::<DrumkitLabel>(sample).is_ok());
         assert!(set.get_label::<DrumkitLabel>(sample).unwrap() == Some(DrumkitLabel::Clap));
 
@@ -432,10 +403,10 @@ mod tests {
             Some(Label::DrumkitLabel(DrumkitLabel::Clap))
         ));
 
-        assert!(set.set_label(sample, DrumkitLabel::MidTom).is_ok());
+        assert!(set.set_label(sample, Some(DrumkitLabel::MidTom)).is_ok());
         assert!(set.get_label::<DrumkitLabel>(sample).unwrap() == Some(DrumkitLabel::MidTom));
 
-        assert!(set.set_label::<Label, Option<Label>>(sample, None).is_ok());
+        assert!(set.set_label(sample, None::<Label>).is_ok());
         assert!(set.get_label::<DrumkitLabel>(sample).unwrap().is_none());
     }
 
@@ -461,7 +432,7 @@ mod tests {
         let sample = &source.list().unwrap()[0];
 
         set.add(&source, sample.clone()).unwrap();
-        set.set_label(sample, DrumkitLabel::Clap).unwrap();
+        set.set_label(sample, Some(DrumkitLabel::Clap)).unwrap();
         set.remove(&source.list().unwrap()[0]).unwrap();
 
         assert!(set.cached_audio_hash_of(sample).is_err());

@@ -704,9 +704,9 @@ mod tests {
         set.add_with_hash(ch.clone(), "ch".to_string());
         set.add_with_hash(sd.clone(), "sd".to_string());
 
-        set.set_label(bd, DrumkitLabel::BassDrum).unwrap();
-        set.set_label(ch, DrumkitLabel::ClosedHihat).unwrap();
-        set.set_label(sd, DrumkitLabel::SnareDrum).unwrap();
+        set.set_label(bd, Some(DrumkitLabel::BassDrum)).unwrap();
+        set.set_label(ch, Some(DrumkitLabel::ClosedHihat)).unwrap();
+        set.set_label(sd, Some(DrumkitLabel::SnareDrum)).unwrap();
 
         (source, set)
     }
@@ -880,9 +880,9 @@ mod tests {
         let ch = member!(set, "hihat.wav");
         let sd = member!(set, "snare.wav");
 
-        set.set_label(&bd, DrumkitLabel::SnareDrum).unwrap();
-        set.set_label(&ch, DrumkitLabel::BassDrum).unwrap();
-        set.set_label(&sd, DrumkitLabel::ClosedHihat).unwrap();
+        set.set_label(&bd, Some(DrumkitLabel::SnareDrum)).unwrap();
+        set.set_label(&ch, Some(DrumkitLabel::BassDrum)).unwrap();
+        set.set_label(&sd, Some(DrumkitLabel::ClosedHihat)).unwrap();
 
         assert_eq!(renderer.render(buf1.as_mut_slice()).0, buf1.len());
 

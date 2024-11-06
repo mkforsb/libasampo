@@ -85,7 +85,7 @@ impl TryIntoDomain<DomBaseSampleSet> for BaseSampleSetV1 {
 
             result.add_with_hash(sample.clone(), entry.audio_hash);
 
-            result.set_label::<Label, Option<Label>>(
+            result.set_label(
                 &sample,
                 if let Some(text) = entry.label {
                     if text.starts_with("DrumkitLabel.") {
@@ -199,7 +199,7 @@ mod tests {
         set.add(&src, s1.clone()).unwrap();
         set.add(&src, s2.clone()).unwrap();
 
-        set.set_label(s1, DrumkitLabel::CrashCymbal).unwrap();
+        set.set_label(s1, Some(DrumkitLabel::CrashCymbal)).unwrap();
 
         let serializable = SampleSet::try_from_domain(&DomSampleSet::BaseSampleSet(set)).unwrap();
 
