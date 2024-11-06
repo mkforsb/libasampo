@@ -337,6 +337,7 @@ mod tests {
 
     use super::*;
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
     struct DummyHasher;
 
     impl AudioHasher for DummyHasher {

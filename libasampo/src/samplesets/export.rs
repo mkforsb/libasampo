@@ -425,6 +425,7 @@ mod tests {
 
     #[test]
     fn test_plain_copy() {
+        #[derive(Debug, Clone, PartialEq, Eq)]
         struct DummyHasher;
 
         impl AudioHasher for DummyHasher {

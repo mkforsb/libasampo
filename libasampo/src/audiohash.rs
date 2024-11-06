@@ -10,7 +10,7 @@ use symphonia::core::{
 
 use crate::{errors::Error, sources::SourceReader};
 
-pub trait AudioHasher {
+pub trait AudioHasher: std::fmt::Debug + Clone + PartialEq + Eq {
     /// Compute the MD5 hash checksum of the audio data (i.e excluding any headers) in a
     /// given audio source.
     fn audio_hash(reader: SourceReader) -> Result<String, Error>;

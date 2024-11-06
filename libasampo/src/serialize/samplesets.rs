@@ -182,6 +182,7 @@ mod tests {
 
     #[test]
     fn test_basesampleset() {
+        #[derive(Debug, Clone, PartialEq, Eq)]
         struct DummyHasher;
 
         impl AudioHasher for DummyHasher {
